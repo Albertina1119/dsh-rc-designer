@@ -103,6 +103,20 @@ input:focus,select:focus{border-color:var(--acc);box-shadow:0 0 0 2px rgba(76,20
 input:disabled{opacity:.4;cursor:not-allowed}
 .dimtag{font-size:10px;padding:1px 6px;border-radius:20px;white-space:nowrap}
 
+/* ---------- 锚点表：引擎计算值 ---------- */
+.autoval{font-weight:600;color:var(--acc);font-variant-numeric:tabular-nums;font-size:12.5px}
+.autoval.dim{color:var(--tx3);font-weight:400}
+.autotag{font-size:9px;padding:1px 4px;border-radius:4px;margin-left:5px;vertical-align:middle;white-space:nowrap}
+.autotag.cal{background:rgba(57,217,138,.16);color:var(--ok)}
+.autotag.dft{background:rgba(159,176,208,.12);color:var(--tx3)}
+.autobox{margin-top:10px;padding:10px 11px;border:1px solid rgba(57,217,138,.28);border-radius:9px;background:rgba(57,217,138,.06)}
+.autohead{font-size:11px;color:var(--ok);font-weight:600;margin-bottom:7px;letter-spacing:.3px}
+.autohead .n2{display:inline-block;min-width:16px;padding:0 5px;border-radius:8px;background:rgba(57,217,138,.22);text-align:center}
+.autolist{display:flex;flex-wrap:wrap;gap:5px}
+.autoitem{font-size:10.5px;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.05);color:var(--tx2);border:1px solid var(--line)}
+.autoitem b{color:var(--tx3);font-weight:400}
+.autoitem.more{color:var(--tx3)}
+
 /* ---------- 按钮 ---------- */
 .btn{
   border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--tx);border-radius:9px;
@@ -308,6 +322,7 @@ table.cmp td.best{color:var(--ok);font-weight:700}
           </table>
         </div>
         <div class="hint" id="anchorHint" style="margin-top:9px"></div>
+        <div class="autobox" id="anchorAuto" style="display:none"></div>
         <div class="btnrow" style="margin-top:11px">
           <button class="btn pri" id="btnPlan" style="flex:1">生成推荐方案 →</button>
         </div>
@@ -493,6 +508,44 @@ function renderTypes() {
 /* =====================================================================
  * 左栏：锚点
  * =================================================================== */
+/** 取某个锚点在当前方案里的引擎计算值 */
+function computedAnchor(id) {
+  if (!S.result || !S.result.anchorValues) return null;
+  for (const r of S.result.anchorValues) if (r.id === id) return r;
+  return null;
+}
+
+/** 锚点表下方的「引擎自动补全」汇总 */
+function renderAnchorAuto() {
+  const box = $('anchorAuto');
+  if (!box) return;
+  if (!S.result || !S.result.anchorValues) {
+    box.style.display = 'none';
+    return;
+  }
+  const auto = S.result.anchorValues.filter(r => r.source === 'engine' && r.value !== null);
+  const dft = S.result.anchorValues.filter(r => r.source === 'baseline' && r.value !== null);
+  if (!auto.length) { box.style.display = 'none'; return; }
+  // 优先展示对设计最有影响的几项
+  const priority = ['prop', 'kv', 'area', 'mass', 'ar', 'chord', 'twr', 'vmax', 'vstall', 'endurance', 'voltage', 'capa'];
+  const pick = auto.slice().sort((a, b) => {
+    const ia = priority.indexOf(a.id), ib = priority.indexOf(b.id);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  }).slice(0, 8);
+  const fmt1 = (r) => {
+    const v = r.value;
+    const s = Math.abs(v) >= 100 ? v.toFixed(0) : (Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2));
+    return '<b>' + r.label + '</b> ' + s + (r.unit ? ' ' + r.unit : '');
+  };
+  box.style.display = '';
+  box.innerHTML =
+    '<div class="autohead">引擎自动补全的锚点 <span class="n2">' + auto.length + '</span> 项' +
+    (dft.length ? '　<span style="color:var(--tx3)">另有 ' + dft.length + ' 项沿用模板默认</span>' : '') + '</div>' +
+    '<div class="autolist">' + pick.map(r => '<span class="autoitem">' + fmt1(r) + '</span>').join('') +
+    (auto.length > pick.length ? '<span class="autoitem more">…共 ' + auto.length + ' 项</span>' : '') + '</div>' +
+    '<div class="hint" style="margin-top:6px">这些值由引擎计算或择优得出，可直接采用；若想改为自己指定，勾选左侧方框即可。</div>';
+}
+
 function applicableAnchors() {
   const type = S.typeId ? DesignEngine.TYPE_BY_ID[S.typeId] : null;
   const rotary = type ? !!type.rotary : false;
@@ -538,20 +591,38 @@ function renderAnchors() {
     const picked = S.anchors[a.id] !== undefined;
     const tr = document.createElement('tr');
     const eff = S.anchors[a.id] !== undefined ? S.anchors[a.id] : a.def;
+    // 未勾选的锚点：显示引擎算出来的值（文档要求「添加其余计算出的未知锚点」）
+    const comp = picked ? null : computedAnchor(a.id);
+    let valueCell;
+    if (picked) {
+      valueCell = a.kind === 'enum'
+        ? '<select data-v="' + a.id + '">' +
+          a.options.map(o => '<option value="' + o.v + '"' + (Number(eff) === o.v ? ' selected' : '') + '>' + o.t + '</option>').join('') + '</select>'
+        : '<input type="number" data-v="' + a.id + '" value="' + eff + '" step="' + a.step + '" min="' + a.min +
+          '" max="' + a.max + '">';
+    } else if (comp && comp.value !== null && isFinite(comp.value)) {
+      const srcTag = comp.source === 'engine'
+        ? '<span class="autotag cal">引擎计算</span>'
+        : '<span class="autotag dft">模板默认</span>';
+      const shown = comp.kind === 'enum' && comp.options
+        ? (comp.options.filter(o => o.v === comp.value)[0] || {}).t || comp.value
+        : (Math.abs(comp.value) >= 100 ? comp.value.toFixed(0)
+          : comp.value.toFixed(comp.value < 1 ? 3 : 2).replace(/\.?0+$/, ''));
+      valueCell = '<span class="autoval" title="' + (comp.note || '由引擎计算得出') + '">' + shown + '</span>' + srcTag;
+    } else {
+      valueCell = '<span class="autoval dim">—</span>';
+    }
     tr.innerHTML =
       '<td class="cb"><input type="checkbox" data-k="' + a.id + '"' + (picked ? ' checked' : '') + '></td>' +
       '<td class="lb">' + a.label + '</td>' +
-      '<td>' + (a.kind === 'enum'
-        ? '<select data-v="' + a.id + '"' + (picked ? '' : ' disabled') + '>' +
-          a.options.map(o => '<option value="' + o.v + '"' + (Number(eff) === o.v ? ' selected' : '') + '>' + o.t + '</option>').join('') + '</select>'
-        : '<input type="number" data-v="' + a.id + '" value="' + eff + '" step="' + a.step + '" min="' + a.min +
-          '" max="' + a.max + '"' + (picked ? '' : ' disabled') + '>') + '</td>' +
+      '<td>' + valueCell + '</td>' +
       '<td class="un">' + (a.unit || '—') + '</td>' +
       '<td><span class="dimtag" style="background:' + DIMCOLOR[a.dim] + '22;color:' + DIMCOLOR[a.dim] +
         ';border:1px solid ' + DIMCOLOR[a.dim] + '44">' + DesignEngine.DIMENSIONS[a.dim].name + '</span></td>';
-    if (!picked) tr.style.opacity = '.5';
+    if (!picked) tr.style.opacity = '.78';
     body.appendChild(tr);
   });
+  renderAnchorAuto();
 
   body.querySelectorAll('input[type=checkbox]').forEach(cb => {
     cb.onchange = () => {
@@ -647,6 +718,8 @@ function doPlan() {
   renderCompare();
   renderNames(true);
   renderSnapshot();
+  // 刷新锚点表：未勾选的锚点现在显示引擎算出的值
+  renderAnchors();
   $('hsCand').textContent = res.candidatesEvaluated;
   $('hsFeas').textContent = res.feasibleCount;
   $('hsConf').textContent = res.top3[0].plan.confidence + '%';
@@ -758,6 +831,7 @@ function renderPlans(res) {
 function selectPlan(i) {
   S.selected = i;
   renderPlans(S.result); renderParams(); renderChecks(); renderScores(); renderReasons(); renderAirfoil(S.result);
+  renderAnchors();
   toast('已切换到「' + S.result.top3[i].label + '」', 'ok');
 }
 
@@ -1221,6 +1295,7 @@ function exportXlsx() {
     snapshot: S.snapshot,
     top3: S.result.top3,
     anchors: S.anchors,
+    anchorValues: S.result.anchorValues,
     dimensionInfo: S.result.dimensionInfo,
     airfoilRecommendations: S.result.airfoilRecommendations,
     naming: S.naming,
@@ -1257,6 +1332,7 @@ $('btnApply').onclick = () => {
   renderDims(res); renderAirfoil(res); renderPlans(res); renderParams();
   renderChecks(); renderScores(); renderReasons(); renderNames(false); renderSnapshot();
   renderCompare();
+  renderAnchors();
   $('hsConf').textContent = res.top3[0].plan.confidence + '%';
   toast('已按锁定参数重新推荐', 'ok');
 };
