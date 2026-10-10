@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RC 飞行器总体设计引擎 · 锚点驱动方案推荐</title>
+<style>
+:root{
+  --bg:#0b1220; --bg2:#0f1830; --card:#131e37; --card2:#182544; --line:#24345a;
+  --tx:#e8eefc; --tx2:#9fb0d0; --tx3:#6b7fa6;
+  --acc:#4cc9f0; --acc2:#4361ee; --ok:#39d98a; --warn:#ffb020; --err:#ff5c72;
+  --gold:#f9c74f; --purple:#c77dff;
+  --sp:14px; --r:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:radial-gradient(1200px 700px at 15% -10%,#16264a 0%,transparent 55%),
+             radial-gradient(900px 600px at 100% 0%,#1a1740 0%,transparent 50%),var(--bg);
+  color:var(--tx);
+  font:14px/1.6 "Segoe UI","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:#0d1730}
+::-webkit-scrollbar-thumb{background:#2b3f6b;border-radius:5px}
+::-webkit-scrollbar-thumb:hover{background:#3a548c}
+
+/* ---------- 顶栏 ---------- */
+header{
+  position:sticky;top:0;z-index:50;background:rgba(11,18,32,.9);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);padding:10px 18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:.5px}
+.logo .mark{
+  width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:17px;
+  background:linear-gradient(135deg,var(--acc),var(--acc2));box-shadow:0 4px 16px rgba(67,97,238,.45);
+}
+.logo small{display:block;font-weight:400;font-size:11px;color:var(--tx3);letter-spacing:1.6px}
+header .spacer{flex:1}
+.hstat{display:flex;gap:16px;font-size:12px;color:var(--tx3)}
+.hstat b{color:var(--acc);font-size:15px;font-variant-numeric:tabular-nums}
+
+/* ---------- 布局 ---------- */
+.wrap{display:grid;grid-template-columns:340px minmax(420px,1fr) 430px;gap:var(--sp);padding:var(--sp);align-items:start}
+@media(max-width:1500px){.wrap{grid-template-columns:320px 1fr} .col-right{grid-column:1/-1}}
+@media(max-width:1080px){.wrap{grid-template-columns:1fr} .col-left,.col-mid,.col-right{grid-column:1/-1}}
+.col{display:flex;flex-direction:column;gap:var(--sp);min-width:0}
+
+/* ---------- 卡片 ---------- */
+.card{background:linear-gradient(180deg,var(--card),var(--bg2));border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.card>h2{
+  font-size:12.5px;font-weight:600;letter-spacing:1.2px;color:var(--tx2);text-transform:uppercase;
+  padding:11px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,.02);
+}
+.card>h2 .n{
+  width:19px;height:19px;border-radius:5px;background:rgba(76,201,240,.15);color:var(--acc);
+  font-size:11px;display:grid;place-items:center;font-weight:700;flex:none;
+}
+.card>h2 .r{margin-left:auto;font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;color:var(--tx3)}
+.card .body{padding:13px 14px}
+.card .body.tight{padding:0}
+.hint{font-size:11.5px;color:var(--tx3);line-height:1.55}
+
+/* ---------- 机型选择 ---------- */
+.types{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.type{
+  padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:rgba(255,255,255,.015);
+  cursor:pointer;transition:.15s;text-align:left;
+}
+.type:hover{border-color:#37507f;background:rgba(76,201,240,.06)}
+.type.on{border-color:var(--acc);background:rgba(76,201,240,.13);box-shadow:inset 0 0 0 1px rgba(76,201,240,.25)}
+.type .t{font-size:12.5px;font-weight:600}
+.type .s{font-size:10.5px;color:var(--tx3);margin-top:2px;line-height:1.35}
+
+/* ---------- 锚点表 ---------- */
+.src-tabs{display:flex;gap:5px;margin-bottom:10px;flex-wrap:wrap}
+.src-tab{
+  font-size:11.5px;padding:4px 9px;border-radius:20px;border:1px solid var(--line);
+  color:var(--tx2);cursor:pointer;background:transparent;transition:.15s;
+}
+.src-tab:hover{border-color:#37507f;color:var(--tx)}
+.src-tab.on{background:rgba(76,201,240,.15);border-color:var(--acc);color:var(--acc)}
+.anchors{width:100%;border-collapse:collapse}
+.anchors th{
+  font-size:10.5px;color:var(--tx3);font-weight:500;text-align:left;padding:5px 6px;
+  border-bottom:1px solid var(--line);letter-spacing:.5px;
+}
+.anchors td{padding:3px 4px;border-bottom:1px solid rgba(36,52,90,.5)}
+.anchors tr.dim td{background:rgba(255,255,255,.02)}
+.anchors .cb{width:26px;text-align:center}
+.anchors .lb{white-space:nowrap;font-size:12.5px}
+.anchors .un{width:44px;font-size:11px;color:var(--tx3)}
+.anchors tr.dis{opacity:.32}
+input[type=checkbox]{accent-color:var(--acc);width:15px;height:15px;cursor:pointer}
+input[type=number],input[type=text],select{
+  background:#0a1striped;background:#0a1428;border:1px solid var(--line);color:var(--tx);
+  border-radius:7px;padding:5px 7px;font:inherit;font-size:12.5px;width:100%;outline:none;transition:.15s;
+}
+input[type=number]{text-align:right;font-variant-numeric:tabular-nums}
+input:focus,select:focus{border-color:var(--acc);box-shadow:0 0 0 2px rgba(76,201,240,.15)}
+input:disabled{opacity:.4;cursor:not-allowed}
+.dimtag{font-size:10px;padding:1px 6px;border-radius:20px;white-space:nowrap}
+
+/* ---------- 按钮 ---------- */
+.btn{
+  border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--tx);border-radius:9px;
+  padding:8px 14px;font:inherit;font-size:12.5px;cursor:pointer;transition:.15s;display:inline-flex;
+  align-items:center;justify-content:center;gap:6px;white-space:nowrap;
+}
+.btn:hover{border-color:#3f5c95;background:rgba(76,201,240,.09)}
+.btn:active{transform:translateY(1px)}
+.btn.pri{background:linear-gradient(135deg,var(--acc2),#5a3fd6);border-color:transparent;font-weight:600}
+.btn.pri:hover{filter:brightness(1.12)}
+.btn.ok{background:linear-gradient(135deg,#1f9d63,#28b478);border-color:transparent;font-weight:600}
+.btn.ok:hover{filter:brightness(1.12)}
+.btn.ghost{background:transparent}
+.btn.sm{padding:5px 10px;font-size:11.5px}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ---------- 维度识别条 ---------- */
+.dims{display:flex;gap:6px;flex-wrap:wrap}
+.dimpill{
+  font-size:11px;padding:3px 9px;border-radius:20px;border:1px solid;display:flex;align-items:center;gap:5px;
+}
+.dimpill .d{width:6px;height:6px;border-radius:50%}
+.pathbox{
+  margin-top:9px;padding:9px 11px;border-left:2px solid var(--acc);background:rgba(76,201,240,.07);
+  border-radius:0 8px 8px 0;font-size:12px;color:var(--tx2);line-height:1.6;
+}
+.pathbox b{color:var(--acc)}
+
+/* ---------- 翼型推荐 ---------- */
+.af{display:flex;flex-direction:column;gap:7px}
+.afitem{
+  display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:9px;
+  cursor:pointer;transition:.15s;background:rgba(255,255,255,.015);
+}
+.afitem:hover{border-color:#37507f;background:rgba(76,201,240,.06)}
+.afitem.on{border-color:var(--acc);background:rgba(76,201,240,.12)}
+.afitem .rank{width:20px;height:20px;border-radius:6px;background:rgba(76,201,240,.15);color:var(--acc);
+  font-size:11px;font-weight:700;display:grid;place-items:center;flex:none}
+.afitem .nm{font-weight:600;font-size:13px}
+.afitem .meta{font-size:11px;color:var(--tx3);margin-top:1px}
+.afitem .bar{height:3px;border-radius:2px;background:#22335a;margin-top:5px;overflow:hidden}
+.afitem .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.afitem .sc{font-size:15px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums;margin-left:auto;flex:none}
+.afwhy{font-size:11px;color:var(--tx3);margin-top:4px;line-height:1.5}
+
+/* ---------- Top3 ---------- */
+.plan{
+  border:1px solid var(--line);border-radius:11px;margin-bottom:10px;overflow:hidden;cursor:pointer;transition:.15s;
+  background:rgba(255,255,255,.015);
+}
+.plan:hover{border-color:#3f5c95}
+.plan.on{border-color:var(--acc);box-shadow:0 0 0 1px rgba(76,201,240,.35),0 8px 26px rgba(0,0,0,.32)}
+.plan .hd{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);
+  background:linear-gradient(90deg,rgba(76,201,240,.09),transparent)}
+.plan.on .hd{background:linear-gradient(90deg,rgba(76,201,240,.18),transparent)}
+.plan .hd .t{font-weight:700;font-size:14px}
+.plan .hd .tag{font-size:10.5px;padding:2px 8px;border-radius:20px;background:rgba(249,199,79,.15);color:var(--gold);border:1px solid rgba(249,199,79,.3)}
+.plan .hd .sc{margin-left:auto;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums;
+  background:linear-gradient(135deg,var(--acc),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+.plan .bd{padding:11px 12px}
+.kvmini{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px}
+.kvmini .k{font-size:10.5px;color:var(--tx3)}
+.kvmini .v{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.kvmini .v small{font-size:10.5px;font-weight:400;color:var(--tx3);margin-left:2px}
+
+/* ---------- 评分条 ---------- */
+.scores{display:flex;flex-direction:column;gap:7px;margin-top:11px}
+.scorerow{display:grid;grid-template-columns:52px 1fr 34px;gap:9px;align-items:center;font-size:11.5px}
+.scorerow .nm{color:var(--tx2)}
+.scorerow .bar{height:6px;border-radius:3px;background:#1b2a4c;overflow:hidden}
+.scorerow .bar i{display:block;height:100%;border-radius:3px;transition:width .5s cubic-bezier(.2,.7,.3,1)}
+.scorerow .vl{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;color:var(--tx2)}
+
+/* ---------- 参数表 ---------- */
+table.params{width:100%;border-collapse:collapse;font-size:12.5px}
+table.params th{
+  font-size:10.5px;color:var(--tx3);font-weight:500;text-align:left;padding:6px 7px;
+  border-bottom:1px solid var(--line);position:sticky;top:0;background:#101c34;z-index:2;
+}
+table.params td{padding:4px 7px;border-bottom:1px solid rgba(36,52,90,.45);vertical-align:middle}
+table.params tr:hover td{background:rgba(76,201,240,.04)}
+table.params tr.lk td{background:rgba(249,199,79,.06)}
+table.params .pn{color:var(--tx2)}
+table.params .pv{font-variant-numeric:tabular-nums;font-weight:600;color:var(--acc);white-space:nowrap}
+table.params .pu{font-size:10.5px;color:var(--tx3)}
+table.params .pf{font-size:10.5px;color:var(--tx3);line-height:1.4}
+table.params input[type=number]{width:88px;padding:3px 6px;font-size:12px}
+.lockbtn{
+  width:22px;height:22px;border-radius:6px;border:1px solid var(--line);background:transparent;
+  cursor:pointer;display:grid;place-items:center;font-size:11px;color:var(--tx3);transition:.15s;
+}
+.lockbtn:hover{border-color:var(--gold);color:var(--gold)}
+.lockbtn.on{background:rgba(249,199,79,.18);border-color:var(--gold);color:var(--gold)}
+.grp{
+  font-size:11px;font-weight:700;letter-spacing:1px;color:var(--acc);padding:9px 7px 5px;
+  border-bottom:1px solid var(--line);background:rgba(76,201,240,.05);
+}
+
+/* ---------- 校验表 ---------- */
+table.checks{width:100%;border-collapse:collapse;font-size:12px}
+table.checks th{font-size:10.5px;color:var(--tx3);font-weight:500;text-align:left;padding:6px 7px;border-bottom:1px solid var(--line)}
+table.checks td{padding:5px 7px;border-bottom:1px solid rgba(36,52,90,.45);vertical-align:top}
+table.checks tr.err td{background:rgba(255,92,114,.09)}
+table.checks tr.warn td{background:rgba(255,176,32,.07)}
+.badge{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600;white-space:nowrap;display:inline-block}
+.badge.ok{background:rgba(57,217,138,.15);color:var(--ok)}
+.badge.warn{background:rgba(255,176,32,.18);color:var(--warn)}
+.badge.err{background:rgba(255,92,114,.2);color:var(--err)}
+.badge.info{background:rgba(76,201,240,.15);color:var(--acc)}
+
+/* ---------- 对比表 ---------- */
+table.cmp{width:100%;border-collapse:collapse;font-size:12px}
+table.cmp th{font-size:10.5px;color:var(--tx3);font-weight:600;padding:6px;border-bottom:1px solid var(--line);text-align:center}
+table.cmp th:first-child{text-align:left}
+table.cmp td{padding:4px 6px;border-bottom:1px solid rgba(36,52,90,.45);text-align:center;font-variant-numeric:tabular-nums}
+table.cmp td:first-child{text-align:left;color:var(--tx2)}
+table.cmp tr:hover td{background:rgba(76,201,240,.05)}
+table.cmp td.best{color:var(--ok);font-weight:700}
+
+/* ---------- 命名 ---------- */
+.namebox{display:flex;flex-direction:column;gap:9px}
+.nameout{
+  font-size:19px;font-weight:700;letter-spacing:1px;padding:11px 13px;border-radius:10px;
+  background:linear-gradient(135deg,rgba(76,201,240,.14),rgba(199,125,255,.12));
+  border:1px solid rgba(76,201,240,.32);text-align:center;min-height:48px;display:grid;place-items:center;
+}
+.nameout.empty{color:var(--tx3);font-size:13px;font-weight:400;letter-spacing:0}
+.cands{display:flex;gap:6px;flex-wrap:wrap}
+.cand{
+  font-size:11.5px;padding:4px 10px;border-radius:20px;border:1px solid var(--line);
+  cursor:pointer;color:var(--tx2);transition:.15s;background:transparent;
+}
+.cand:hover{border-color:var(--acc);color:var(--acc)}
+
+/* ---------- 提示 / 状态 ---------- */
+.toast{
+  position:fixed;bottom:22px;left:50%;transform:translate(-50%,26px);z-index:200;
+  background:#16264a;border:1px solid var(--acc);color:var(--tx);padding:10px 20px;border-radius:11px;
+  font-size:13px;box-shadow:0 10px 34px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:.28s;
+}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.err{border-color:var(--err)}
+.toast.ok{border-color:var(--ok)}
+.empty{padding:22px 14px;text-align:center;color:var(--tx3);font-size:12.5px;line-height:1.7}
+.warnlist{display:flex;flex-direction:column;gap:5px;margin-top:9px}
+.warnitem{font-size:11.5px;color:var(--warn);display:flex;gap:6px;line-height:1.5}
+.warnitem::before{content:"!";flex:none;width:14px;height:14px;border-radius:50%;background:rgba(255,176,32,.2);
+  display:grid;place-items:center;font-size:9px;font-weight:700;margin-top:2px}
+.sep{height:1px;background:var(--line);margin:11px 0}
+.snapbox{font-size:11.5px;color:var(--tx3);line-height:1.7;word-break:break-all}
+.snapbox code{color:var(--acc);font-family:Consolas,monospace}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+.chip{font-size:10.5px;padding:2px 9px;border-radius:20px;background:rgba(255,255,255,.05);color:var(--tx2);border:1px solid var(--line)}
+.chip.on{background:rgba(76,201,240,.15);border-color:var(--acc);color:var(--acc)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="mark">✦</div>
+    <div>RC 飞行器总体设计引擎
+      <small>ANCHOR-DRIVEN DESIGN · NACA AIRFOIL · TOP3</small>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <div class="hstat">
+    <div>候选方案 <b id="hsCand">—</b></div>
+    <div>可行 <b id="hsFeas">—</b></div>
+    <div>置信度 <b id="hsConf">—</b></div>
+  </div>
+  <div class="btnrow">
+    <button class="btn sm ghost" id="btnDemo">载入示例</button>
+    <button class="btn sm ghost" id="btnReset">清空锚点</button>
+    <button class="btn sm pri" id="btnTop">↑ 顶部</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ============ 左栏 ============ -->
+  <div class="col col-left">
+
+    <div class="card">
+      <h2><span class="n">1</span>机型选择<span class="r">也可留空自动识别</span></h2>
+      <div class="body">
+        <div class="types" id="typeList"></div>
+        <div class="btnrow" style="margin-top:10px">
+          <button class="btn sm" id="btnAuto" style="flex:1">自动识别机型（依锚点推断）</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="n">2</span>数值锚点<span class="r" id="anchorCount">0 / 2~4</span></h2>
+      <div class="body">
+        <div class="src-tabs" id="dimTabs"></div>
+        <div style="max-height:330px;overflow:auto">
+          <table class="anchors">
+            <thead><tr><th class="cb"></th><th>锚点</th><th>数值</th><th class="un">单位</th><th>维度</th></tr></thead>
+            <tbody id="anchorBody"></tbody>
+          </table>
+        </div>
+        <div class="hint" id="anchorHint" style="margin-top:9px"></div>
+        <div class="btnrow" style="margin-top:11px">
+          <button class="btn pri" id="btnPlan" style="flex:1">生成推荐方案 →</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="cardDim" style="display:none">
+      <h2><span class="n">3</span>维度识别与推理路径</h2>
+      <div class="body" id="dimBody"></div>
+    </div>
+
+    <div class="card" id="cardAf" style="display:none">
+      <h2><span class="n">4</span>NACA 翼型推荐<span class="r" id="afRe"></span></h2>
+      <div class="body">
+        <div class="af" id="afList"></div>
+        <div class="sep"></div>
+        <div class="hint" style="margin-bottom:6px">手动指定 NACA 编号（4 位 / 5 位 / 6 位）</div>
+        <div style="display:flex;gap:7px">
+          <input type="text" id="afManual" placeholder="如 2412 / 23012 / 65-210" spellcheck="false">
+          <button class="btn sm" id="btnAfApply">应用</button>
+        </div>
+        <div class="hint" id="afMsg" style="margin-top:6px"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ 中栏 ============ -->
+  <div class="col col-mid">
+
+    <div class="card">
+      <h2><span class="n">5</span>Top3 推荐方案<span class="r" id="planType"></span></h2>
+      <div class="body" id="planList">
+        <div class="empty">在左侧勾选 2~4 个数值锚点（覆盖至少 2 个维度），<br>点击「生成推荐方案」开始。</div>
+      </div>
+    </div>
+
+    <div class="card" id="cardScore" style="display:none">
+      <h2><span class="n">6</span>多目标评分<span class="r">六维度加权</span></h2>
+      <div class="body">
+        <div id="scoreTitle" style="font-size:12.5px;color:var(--tx2);margin-bottom:9px"></div>
+        <div class="scores" id="scoreBars"></div>
+        <div class="sep"></div>
+        <div class="hint" id="scoreNote"></div>
+      </div>
+    </div>
+
+    <div class="card" id="cardCmp" style="display:none">
+      <h2><span class="n">7</span>三套方案对比<span class="r">优选值高亮</span></h2>
+      <div class="body tight"><div style="overflow:auto;max-height:430px" id="cmpWrap"></div></div>
+    </div>
+
+  </div>
+
+  <!-- ============ 右栏 ============ -->
+  <div class="col col-right">
+
+    <div class="card">
+      <h2><span class="n">8</span>完整参数<span class="r" id="paramHint">未生成</span></h2>
+      <div class="body tight">
+        <div class="chips" id="paramTabs" style="padding:10px 12px 0"></div>
+        <div style="max-height:600px;overflow:auto">
+          <table class="params" id="paramTable">
+            <thead><tr><th style="width:24px"></th><th>参数</th><th>取值</th><th>说明</th></tr></thead>
+            <tbody id="paramBody"><tr><td colspan="4" class="empty">尚未生成方案</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="body" style="border-top:1px solid var(--line)">
+        <div class="hint" style="margin-bottom:8px">修改数值后点击「应用并重新推荐」，锁定的参数（🔒）会被保留。</div>
+        <div class="btnrow">
+          <button class="btn ok" id="btnApply" style="flex:1" disabled>应用并重新推荐</button>
+          <button class="btn" id="btnUnlock" disabled>解除全部锁定</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="cardCheck" style="display:none">
+      <h2><span class="n">9</span>约束校验<span class="r" id="checkSum"></span></h2>
+      <div class="body tight"><div style="max-height:330px;overflow:auto" id="checkWrap"></div></div>
+    </div>
+
+    <div class="card" id="cardReason" style="display:none">
+      <h2><span class="n">10</span>推荐理由与警告</h2>
+      <div class="body" id="reasonBody"></div>
+    </div>
+
+    <div class="card" id="cardName" style="display:none">
+      <h2><span class="n">11</span>飞机命名<span class="r">非必填</span></h2>
+      <div class="body">
+        <div class="namebox">
+          <div class="nameout empty" id="nameOut">未命名（不影响保存与导出）</div>
+          <div class="cands" id="nameCands"></div>
+          <div style="display:flex;gap:7px">
+            <input type="text" id="nameCustom" placeholder="自定义名称（可留空）" maxlength="24">
+            <button class="btn sm" id="btnNameOk">采用</button>
+          </div>
+          <div class="btnrow">
+            <button class="btn sm" id="btnNameGen">↻ 换一批</button>
+            <button class="btn sm ghost" id="btnNameSkip">跳过命名</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="cardOut" style="display:none">
+      <h2><span class="n">12</span>方案冻结与导出</h2>
+      <div class="body">
+        <div class="snapbox" id="snapInfo"></div>
+        <div class="btnrow" style="margin-top:11px">
+          <button class="btn ok" id="btnFreeze" style="flex:1">确定方案 · 生成只读快照</button>
+        </div>
+        <div class="btnrow" style="margin-top:8px">
+          <button class="btn pri" id="btnXlsx" style="flex:1" disabled>⤓ 导出 Excel（17 个工作表）</button>
+        </div>
+        <div class="hint" id="exportMsg" style="margin-top:9px"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="airfoil-lib.js"></script>
+<script src="design-engine.js"></script>
+<script src="xlsx-export.js"></script>
+<script>
+/* =====================================================================
+ * 应用状态
+ * =================================================================== */
+const S = {
+  typeId: 'trainer',          // null = 自动识别
+  anchors: {},                // { key: 数值 }
+  dimFilter: null,
+  locks: {},                  // { key: 数值 }
+  result: null,               // DesignEngine.plan() 结果
+  selected: 0,                // 选中的 Top3 下标
+  paramTab: 'overview',
+  naming: { name: '', candidates: [], skipped: false, custom: false },
+  snapshot: null,
+  versionHistory: [],
+  anchorsConfirmed: false,
+  frozen: false
+};
+
+const DIMCOLOR = { geometry:'#4cc9f0', weight:'#f9c74f', power:'#f8961e', performance:'#90be6d', style:'#c77dff' };
+const $ = (id) => document.getElementById(id);
+const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+const fmt = (v, n) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(n == null ? 2 : n) : '—';
+
+function toast(msg, kind) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast on' + (kind ? ' ' + kind : '');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { t.className = 'toast'; }, 2400);
+}
+
+/* =====================================================================
+ * 左栏：机型
+ * =================================================================== */
+function renderTypes() {
+  const box = $('typeList');
+  while (box.firstChild) box.removeChild(box.firstChild);
+  box.innerHTML = '';
+  DesignEngine.TYPES.forEach(t => {
+    const d = document.createElement('div');
+    d.className = 'type' + (S.typeId === t.id ? ' on' : '');
+    d.innerHTML = '<div class="t">' + t.name + '</div><div class="s">' +
+      (t.rotary ? '旋翼 · ' : '') + t.notes.slice(0, 26) + '…</div>';
+    d.onclick = () => {
+      S.typeId = (S.typeId === t.id) ? null : t.id;
+      renderTypes(); renderAnchors(); autoPlan();
+    };
+    box.appendChild(d);
+  });
+}
+
+/* =====================================================================
+ * 左栏：锚点
+ * =================================================================== */
+function applicableAnchors() {
+  const type = S.typeId ? DesignEngine.TYPE_BY_ID[S.typeId] : null;
+  const rotary = type ? !!type.rotary : false;
+  return DesignEngine.ANCHORS.filter(a => {
+    if (a.rotaryOnly) return rotary;
+    if (rotary && a.rotaryOk === false) return false;
+    if (rotary && DesignEngine.ANCHOR_BY_ID[a.id] && (a.id === 'ar' || a.id === 'taper' ||
+        a.id === 'chord' || a.id === 'vmax' && false)) return false;
+    return true;
+  });
+}
+
+function renderDimTabs() {
+  const box = $('dimTabs');
+  while (box.firstChild) box.removeChild(box.firstChild);
+  const dims = ['all'].concat(Object.keys(DesignEngine.DIMENSIONS));
+  box.innerHTML = '';
+  dims.forEach(d => {
+    const b = document.createElement('button');
+    b.className = 'src-tab' + ((S.dimFilter === d || (d === 'all' && !S.dimFilter)) ? ' on' : '');
+    b.textContent = d === 'all' ? '全部' : DesignEngine.DIMENSIONS[d].name;
+    if (d !== 'all') b.style.borderColor = DIMCOLOR[d] + '66', b.style.color = DIMCOLOR[d];
+    b.onclick = () => { S.dimFilter = d === 'all' ? null : d; renderDimTabs(); renderAnchors(); };
+    box.appendChild(b);
+  });
+}
+
+function renderAnchors() {
+  const body = $('anchorBody');
+  const list = applicableAnchors().filter(a => !S.dimFilter || a.dim === S.dimFilter);
+  while (body.firstChild) body.removeChild(body.firstChild);
+  body.innerHTML = '';
+  let curDim = null;
+  list.forEach(a => {
+    if (a.dim !== curDim) {
+      curDim = a.dim;
+      const tr = document.createElement('tr');
+      tr.className = 'dim';
+      tr.innerHTML = '<td colspan="5" style="padding:6px 4px 3px;font-size:10.5px;color:' +
+        DIMCOLOR[a.dim] + ';letter-spacing:.6px">● ' + DesignEngine.DIMENSIONS[a.dim].name + '</td>';
+      body.appendChild(tr);
+    }
+    const picked = S.anchors[a.id] !== undefined;
+    const tr = document.createElement('tr');
+    const eff = S.anchors[a.id] !== undefined ? S.anchors[a.id] : a.def;
+    tr.innerHTML =
+      '<td class="cb"><input type="checkbox" data-k="' + a.id + '"' + (picked ? ' checked' : '') + '></td>' +
+      '<td class="lb">' + a.label + '</td>' +
+      '<td>' + (a.kind === 'enum'
+        ? '<select data-v="' + a.id + '"' + (picked ? '' : ' disabled') + '>' +
+          a.options.map(o => '<option value="' + o.v + '"' + (Number(eff) === o.v ? ' selected' : '') + '>' + o.t + '</option>').join('') + '</select>'
+        : '<input type="number" data-v="' + a.id + '" value="' + eff + '" step="' + a.step + '" min="' + a.min +
+          '" max="' + a.max + '"' + (picked ? '' : ' disabled') + '>') + '</td>' +
+      '<td class="un">' + (a.unit || '—') + '</td>' +
+      '<td><span class="dimtag" style="background:' + DIMCOLOR[a.dim] + '22;color:' + DIMCOLOR[a.dim] +
+        ';border:1px solid ' + DIMCOLOR[a.dim] + '44">' + DesignEngine.DIMENSIONS[a.dim].name + '</span></td>';
+    if (!picked) tr.style.opacity = '.5';
+    body.appendChild(tr);
+  });
+
+  body.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.onchange = () => {
+      const k = cb.dataset.k;
+      const def = DesignEngine.ANCHOR_BY_ID[k];
+      if (cb.checked) {
+        if (Object.keys(S.anchors).length >= 4) {
+          cb.checked = false;
+          toast('最多只能选 4 个数值锚点', 'err');
+          return;
+        }
+        S.anchors[k] = def.def;
+      } else {
+        delete S.anchors[k];
+      }
+      renderAnchors(); updateAnchorHint();
+    };
+  });
+  body.querySelectorAll('[data-v]').forEach(inp => {
+    inp.onchange = () => {
+      const k = inp.dataset.v;
+      const def = DesignEngine.ANCHOR_BY_ID[k];
+      let v = Number(inp.value);
+      if (!isFinite(v)) v = def.def;
+      v = clamp(v, def.min, def.max);
+      if (def.kind === 'int') v = Math.round(v);
+      S.anchors[k] = v;
+      inp.value = v;
+      updateAnchorHint();
+    };
+  });
+  updateAnchorHint();
+}
+
+function updateAnchorHint() {
+  const keys = Object.keys(S.anchors);
+  const n = keys.length;
+  $('anchorCount').textContent = n + ' / 2~4';
+  const dims = new Set(keys.map(k => DesignEngine.ANCHOR_BY_ID[k].dim));
+  const okN = n >= 2 && n <= 4;
+  const okD = dims.size >= 2;
+  $('btnPlan').disabled = !(okN && okD);
+  let msg;
+  if (n === 0) msg = '请勾选 2~4 个锚点。锚点越贴近性能指标（翼载 / 推重比 / 速度 / 展弦比），推荐越准。';
+  else if (!okN) msg = n < 2 ? '还需再选 ' + (2 - n) + ' 个锚点。' : '最多 4 个锚点，请取消 ' + (n - 4) + ' 个。';
+  else if (!okD) msg = '当前锚点都落在「' + DesignEngine.DIMENSIONS[DesignEngine.ANCHOR_BY_ID[keys[0]].dim].name +
+    '」一个维度，请再覆盖至少 1 个其他维度。';
+  else msg = '已选 ' + n + ' 个锚点，覆盖 ' + dims.size + ' 个维度（' +
+    [...dims].map(d => DesignEngine.DIMENSIONS[d].name).join('、') + '）。可以生成方案。';
+  $('anchorHint').innerHTML = msg;
+  $('anchorHint').style.color = (okN && okD) ? 'var(--ok)' : 'var(--tx3)';
+}
+
+/* =====================================================================
+ * 生成方案
+ * =================================================================== */
+function autoPlan() {
+  if (S.anchorsConfirmed) doPlan();
+  else if (S.result) doPlan();
+}
+
+function doPlan() {
+  const opts = {};
+  if (S.typeId) opts.typeId = S.typeId;
+  if (Object.keys(S.locks).length) {
+    // 锁定项以锚点形式回灌
+    Object.keys(S.locks).forEach(k => {
+      if (DesignEngine.ANCHOR_BY_ID[k]) S.anchors[k] = S.locks[k];
+    });
+  }
+  opts.seed = 20240715;
+  let res;
+  try {
+    res = DesignEngine.plan(S.anchors, opts);
+  } catch (e) {
+    toast('计算失败：' + e.message, 'err');
+    console.error(e);
+    return;
+  }
+  if (!res.ok) { toast(res.error || '生成失败', 'err'); return; }
+
+  S.result = res;
+  S.selected = 0;
+  S.frozen = false;
+  S.snapshot = null;
+  S.anchorsConfirmed = true;
+
+  renderDims(res);
+  renderAirfoil(res);
+  renderPlans(res);
+  renderParams();
+  renderChecks();
+  renderScores();
+  renderReasons();
+  renderCompare();
+  renderNames(true);
+  renderSnapshot();
+  $('hsCand').textContent = res.candidatesEvaluated;
+  $('hsFeas').textContent = res.feasibleCount;
+  $('hsConf').textContent = res.top3[0].plan.confidence + '%';
+  $('planType').textContent = res.typeName;
+  $('paramHint').textContent = '可锁定后重推';
+  $('btnApply').disabled = false;
+  $('btnUnlock').disabled = false;
+  $('btnXlsx').disabled = true;
+  ['cardDim','cardAf','cardScore','cardCmp','cardCheck','cardReason','cardName','cardOut']
+    .forEach(id => { $(id).style.display = ''; });
+  $('exportMsg').textContent = '';
+  toast('已生成 ' + res.top3.length + ' 套方案（候选 ' + res.candidatesEvaluated + ' 套，可行 ' + res.feasibleCount + ' 套）', 'ok');
+}
+
+/* ---------- 维度识别 ---------- */
+function renderDims(res) {
+  const inf = res.inferred;
+  const box = $('dimBody');
+  box.innerHTML =
+    '<div class="dims">' + (inf.dims.length ? inf.dims.map(d =>
+      '<span class="dimpill" style="background:' + (DIMCOLOR[d] || '#4cc9f0') + '18;border-color:' +
+      (DIMCOLOR[d] || '#4cc9f0') + '55;color:' + (DIMCOLOR[d] || '#4cc9f0') + '">' +
+      '<span class="d" style="background:' + (DIMCOLOR[d] || '#4cc9f0') + '"></span>' +
+      DesignEngine.DIMENSIONS[d].name + '</span>').join('') : '<span class="hint">无</span>') + '</div>' +
+    '<div class="pathbox"><b>推理路径：' + inf.path + '</b><br>' + inf.why +
+    '<br><span style="color:var(--tx3)">机型判定：' + res.typeName + ' · 置信度 ' + inf.confidence + '%</span></div>';
+}
+
+/* ---------- 翼型推荐 ---------- */
+function renderAirfoil(res) {
+  const sel = S.result.top3[S.selected].plan.core.airfoil;
+  $('afRe').textContent = sel ? sel.designation : '';
+  const box = $('afList');
+  while (box.firstChild) box.removeChild(box.firstChild);
+  box.innerHTML = '';
+  (res.airfoilRecommendations || []).forEach((a, i) => {
+    const d = document.createElement('div');
+    d.className = 'afitem' + (sel && a.designation === sel.designation ? ' on' : '');
+    d.innerHTML =
+      '<div class="rank">' + (i + 1) + '</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="nm">' + a.designation + '</div>' +
+        '<div class="meta">厚 ' + (a.tc * 100).toFixed(0) + '% · 弯 ' + (a.camber * 100).toFixed(1) +
+          '% · CLmax ' + a.clmax.toFixed(2) + ' · CD0 ' + (a.cd0 * 1e4).toFixed(0) + 'ct · 失速 ' + a.aStall.toFixed(0) + '°</div>' +
+        '<div class="bar"><i style="width:' + a.score + '%"></i></div>' +
+        '<div class="afwhy">' + (a.why[0] || a.notes) + '</div>' +
+      '</div>' +
+      '<div class="sc">' + a.score + '</div>';
+    d.onclick = () => {
+      S.anchors.airfoil = a.designation;
+      $('afManual').value = a.designation;
+      doPlan();
+      toast('已选用 ' + a.designation, 'ok');
+    };
+    box.appendChild(d);
+  });
+}
+
+/* ---------- Top3 ---------- */
+function renderPlans(res) {
+  const box = $('planList');
+  box.innerHTML = '';
+  res.top3.forEach((t, i) => {
+    const p = t.plan, c = p.core;
+    const d = document.createElement('div');
+    d.className = 'plan' + (i === S.selected ? ' on' : '');
+    const kvm = [
+      ['起飞重量', fmt(c.mass, 2), 'kg'],
+      ['翼面积', fmt(c.area, 3), 'm²'],
+      ['翼展', fmt(c.span, 2), 'm'],
+      ['展弦比', fmt(c.ar, 2), ''],
+      ['翼载', fmt(c.wlGdm2, 0), 'g/dm²'],
+      c.rotary ? ['桨盘载荷', fmt(c.rotary.diskLoading, 0), 'N/m²'] : ['失速速度', fmt(c.vStall, 1), 'm/s'],
+      c.rotary ? ['续航', fmt(c.rotary.enduranceMin, 0), 'min'] : ['最大速度', fmt(c.perf.vMaxCalc, 1), 'm/s'],
+      ['翼型', (c.airfoil && c.airfoil.designation) || (c.rotary ? c.rotary.nrotor + ' 旋翼' : '—'), '']
+    ];
+    d.innerHTML =
+      '<div class="hd"><span class="t">' + t.label + '</span><span class="tag">' + t.tag + '</span>' +
+        '<span class="sc">' + p.score.total + '</span></div>' +
+      '<div class="bd">' +
+        '<div class="hint" style="margin-bottom:9px">' + t.objectiveReason + '</div>' +
+        '<div class="kvmini">' + kvm.map(x =>
+          '<div><div class="k">' + x[0] + '</div><div class="v">' + x[1] +
+          (x[2] ? '<small>' + x[2] + '</small>' : '') + '</div></div>').join('') + '</div>' +
+        '<div class="scores">' + p.score.dimensions.map(dim =>
+          '<div class="scorerow"><span class="nm">' + dim.name + '</span>' +
+          '<span class="bar"><i style="width:' + dim.score + '%;background:' +
+            (dim.score >= 75 ? 'linear-gradient(90deg,#39d98a,#4cc9f0)' :
+             dim.score >= 50 ? 'linear-gradient(90deg,#f9c74f,#f8961e)' : 'linear-gradient(90deg,#ff5c72,#f8961e)') +
+          '"></i></span><span class="vl">' + dim.score + '</span></div>').join('') + '</div>' +
+        (t.warnings.length ? '<div class="warnlist">' + t.warnings.map(w =>
+          '<div class="warnitem">' + w + '</div>').join('') + '</div>' : '') +
+        '<div class="btnrow" style="margin-top:11px">' +
+          '<button class="btn sm ' + (i === S.selected ? 'ok' : '') + '" data-pick="' + i + '">' +
+          (i === S.selected ? '✓ 已选为当前方案' : '采用此方案') + '</button>' +
+        '</div>' +
+      '</div>';
+    d.querySelector('[data-pick]').onclick = (e) => {
+      e.stopPropagation();
+      selectPlan(i);
+    };
+    d.onclick = () => selectPlan(i);
+    box.appendChild(d);
+  });
+}
+
+function selectPlan(i) {
+  S.selected = i;
+  renderPlans(S.result); renderParams(); renderChecks(); renderScores(); renderReasons(); renderAirfoil(S.result);
+  toast('已切换到「' + S.result.top3[i].label + '」', 'ok');
+}
+
+/* =====================================================================
+ * 参数表
+ * =================================================================== */
+const PARAM_TABS = [
+  { k:'overview', n:'总体' }, { k:'geom', n:'机翼' }, { k:'airfoil', n:'翼型' },
+  { k:'tail', n:'尾翼' }, { k:'cg', n:'重心' }, { k:'power', n:'动力' },
+  { k:'perf', n:'性能' }, { k:'struct', n:'结构' }
+];
+
+const LOCKABLE = ['mass','area','span','ar','taper','twr','kv','prop','voltage','capa','payload'];
+
+function renderParamTabs() {
+  const box = $('paramTabs');
+  while (box.firstChild) box.removeChild(box.firstChild);
+  box.innerHTML = '';
+  PARAM_TABS.forEach(t => {
+    const b = document.createElement('span');
+    b.className = 'chip' + (S.paramTab === t.k ? ' on' : '');
+    b.textContent = t.n;
+    b.style.cursor = 'pointer';
+    b.onclick = () => { S.paramTab = t.k; renderParams(); };
+    box.appendChild(b);
+  });
+}
+
+function renderParams() {
+  renderParamTabs();
+  const body = $('paramBody');
+  if (!S.result) { body.innerHTML = '<tr><td colspan="4" class="empty">尚未生成方案</td></tr>'; return; }
+  const p = S.result.top3[S.selected].plan;
+  const c = p.core, pw = c.power, rw = c.rotary, af = c.airfoil || {};
+  const rows = [];
+
+  const lockCell = (k) => {
+    if (!k || LOCKABLE.indexOf(k) < 0) return '<td></td>';
+    const on = S.locks[k] !== undefined;
+    return '<td><button class="lockbtn' + (on ? ' on' : '') + '" data-lock="' + k + '" title="锁定此项">' +
+      (on ? '🔒' : '🔓') + '</button></td>';
+  };
+  const R = (name, k, val, unit, note, dec) => {
+    const locked = k && S.locks[k] !== undefined;
+    const shown = locked ? S.locks[k] : val;
+    const editable = k && LOCKABLE.indexOf(k) >= 0;
+    rows.push('<tr class="' + (locked ? 'lk' : '') + '">' + lockCell(k) +
+      '<td class="pn">' + name + '</td>' +
+      '<td class="pv">' + (editable
+        ? '<input type="number" data-edit="' + k + '" value="' + (isFinite(shown) ? shown : '') + '" step="any">'
+        : (typeof shown === 'number' ? fmt(shown, dec == null ? 2 : dec) : (shown == null ? '—' : shown))) +
+        (editable ? '' : ' <span class="pu">' + (unit || '') + '</span>') + '</td>' +
+      '<td class="pf">' + (note || '') + '</td></tr>');
+  };
+  const G = (t) => rows.push('<tr><td colspan="4" class="grp">' + t + '</td></tr>');
+
+  if (S.paramTab === 'overview') {
+    G('总体参数');
+    R('机型', null, p.typeName, '', '由锚点识别或手动指定');
+    R('起飞重量', 'mass', c.mass, 'kg', 'W = m·g');
+    R('翼面积 S', 'area', c.area, 'm²', 'S = m·10 / wl');
+    R('翼展 b', 'span', c.span, 'm', 'b = √(AR·S)');
+    R('展弦比 AR', 'ar', c.ar, '', 'AR = b²/S');
+    R('梢根比 λ', 'taper', c.taper, '', '尖弦/根弦');
+    R('翼载', null, c.wlGdm2, 'g/dm²', 'wl = m[g]/S[dm²]', 1);
+    R('翼载（力）', null, c.wingLoading, 'N/m²', 'W/S', 0);
+    R('有效载荷', 'payload', c.payload, 'kg', '任务载荷重量');
+    if (!rw) {
+      R('失速速度', null, c.vStall, 'm/s', 'Vs = √(2W/(ρS·CLmax))');
+      R('最大速度', null, c.perf.vMaxCalc, 'm/s', '推力与阻力曲线交点');
+      R('最大升阻比', null, c.ldMax, '', 'L/D = 1/(2√(CD0·k))', 1);
+      R('推重比', 'twr', c.perf.thrustToWeight, '', '静推力/起飞重量');
+      R('爬升率', null, c.perf.roc, 'm/s', '(Pavail−Plevel)/W');
+    } else {
+      R('旋翼数量', null, rw.nrotor, '个', '');
+      R('单个旋翼直径', null, rw.rotorDia * 1000, 'mm', 'D = 2√(A/π)', 0);
+      R('桨盘载荷', null, rw.diskLoading, 'N/m²', 'DL = W/A_disk', 0);
+      R('推重比', 'twr', rw.twrTarget, '', '目标值');
+    }
+    G('评分与置信度');
+    R('综合得分', null, p.score.total, '', '六维加权', 0);
+    R('置信度', null, p.confidence, '%', '受锚点数量与匹配度影响', 0);
+    R('硬约束错误', null, p.errors.length, '项', p.errors.length ? '需调整' : '全部通过', 0);
+    R('软约束警告', null, p.warnings.length, '项', '', 0);
+  }
+
+  if (S.paramTab === 'geom' && !rw) {
+    G('机翼平面形状');
+    R('翼型', null, af.designation || '—', '', af.notes || '');
+    R('翼面积', 'area', c.area, 'm²', '');
+    R('翼展', 'span', c.span, 'm', '');
+    R('展弦比', 'ar', c.ar, '', '');
+    R('梢根比', 'taper', c.taper, '', '');
+    R('根弦', null, c.planform.root * 1000, 'mm', 'cr = 2S/(b(1+λ))', 0);
+    R('尖弦', null, c.planform.tip * 1000, 'mm', 'ct = λ·cr', 0);
+    R('平均气动弦 MAC', null, c.cg.mac * 1000, 'mm', '', 0);
+    R('MAC 展向位置', null, c.planform.yMac * 1000, 'mm', '距对称面', 0);
+    R('后掠角', null, c.sweep, '°', '1/4 弦线');
+    R('上反角', null, c.dihedral, '°', '');
+    R('扭转角', null, c.twist, '°', '正值为根部抬头');
+  }
+
+  if (S.paramTab === 'airfoil') {
+    G('选定翼型');
+    R('编号', null, af.designation || '—', '', af.series || '');
+    R('最大厚度', null, af.tc * 100, '% 弦长', 't/c', 1);
+    R('最大弯度', null, af.camber * 100, '% 弦长', 'm/c', 1);
+    R('最大弯度位置', null, af.pos * 100, '% 弦长', 'p/c', 0);
+    R('二维 CLmax', null, af.clmax, '', 'Re≈1e5~3e5 经验值', 2);
+    R('二维 CD0', null, af.cd0 * 1e4, 'counts', '设计升力附近', 0);
+    R('失速迎角', null, af.aStall, '°', '', 1);
+    R('零升力矩 Cm0', null, af.cm0, '', '负值为低头力矩', 3);
+    R('二维升力线斜率 a0', null, af.a0, '1/deg', '', 3);
+    G('机翼气动');
+    R('三维 CLmax', null, c.clMax3d, '', '有限翼展折减', 2);
+    R('三维升力线斜率', null, c.a3dPerDeg, '1/rad', '含低展弦比与后掠修正', 2);
+    R('巡航雷诺数', null, c.reCruise, '', 'Re = V·MAC/ν', 0);
+    R('零升阻力 CD0', null, c.cd0, '', '翼型型阻+干扰阻力', 4);
+    R('奥斯瓦尔德效率 e', null, c.oswald, '', '', 3);
+  }
+
+  if (S.paramTab === 'tail') {
+    if (rw) { rows.push('<tr><td colspan="4" class="empty">旋翼机型不使用尾翼布局</td></tr>'); }
+    else {
+      G('平尾');
+      R('平尾面积', null, c.tail.Sh * 1e4, 'cm²', 'Vh = Sh·lh/(S·MAC)', 0);
+      R('平尾容量 Vh', null, c.tail.vh, '', '经验 0.35~0.72', 3);
+      R('升降舵弦长比', null, c.tail.elevRatio * 100, '%', '常规 35~45%', 0);
+      G('垂尾');
+      R('垂尾面积', null, c.tail.Sv * 1e4, 'cm²', 'Vv = Sv·lv/(S·b)', 0);
+      R('垂尾容量 Vv', null, c.tail.vv, '', '经验 0.022~0.070', 3);
+      R('方向舵弦长比', null, c.tail.rudderRatio * 100, '%', '常规 35~45%', 0);
+      G('尾臂与舵面');
+      R('尾臂 lh', null, c.tail.lh * 1000, 'mm', '重心→平尾焦点', 0);
+      R('尾臂 lv', null, c.tail.lv * 1000, 'mm', '重心→垂尾焦点', 0);
+      R('副翼弦长比', null, c.tail.aileronRatio * 100, '%', '', 0);
+    }
+  }
+
+  if (S.paramTab === 'cg') {
+    if (rw) { rows.push('<tr><td colspan="4" class="empty">旋翼机型无重心裕度概念，按机架配平处理</td></tr>'); }
+    else {
+      G('重心与稳定');
+      R('MAC', null, c.cg.mac * 1000, 'mm', '', 0);
+      R('机翼焦点', null, c.cg.acPct * 100, '% MAC', '机翼+平尾组合焦点', 1);
+      R('重心位置', null, c.cg.cgPct * 100, '% MAC', '设计目标', 1);
+      R('重心距前缘', null, c.cg.cgMM * 1000, 'mm', '沿 MAC', 0);
+      R('静稳定裕度', null, c.cg.staticMargin, '% MAC', '焦点−重心，正值稳定', 1);
+      R('允许范围', null, ((c.cg.cgPct - .05) * 100).toFixed(1) + ' ~ ' + ((c.cg.cgPct + .04) * 100).toFixed(1), '% MAC', '调试建议');
+      R('推力线', null, c.cg.thrustLine, '', '相对翼弦');
+      R('电池位置', null, '重心前后 ±30 mm 可调', '', '移动电池微调重心');
+    }
+  }
+
+  if (S.paramTab === 'power') {
+    if (pw) {
+      G('电机与螺旋桨');
+      R('电机规格', null, (pw.motor || '—') + ' / ' + pw.kv + ' KV', '', pw.autoSelected ? '引擎自动择优' : '用户锁定');
+      R('电机 KV', 'kv', pw.kv, 'KV', '');
+      R('电机重量', null, pw.motorMass, 'g', '', 0);
+      R('螺旋桨', 'prop', pw.propIn, 'inch', '桨距 ' + pw.propPitch + ' in');
+      R('桨距', null, pw.propPitch, 'inch', '', 1);
+      G('电池与供电');
+      R('电池节数', null, pw.cells, 'S', '标称 ' + pw.voltage.toFixed(1) + ' V');
+      R('电池电压', 'voltage', pw.voltage, 'V', '');
+      R('电池容量', 'capa', pw.capacity, 'mAh', '');
+      R('电池能量', null, pw.energyWh, 'Wh', '', 1);
+      G('推力与电流');
+      R('可用静推力', null, pw.staticThrust, 'N', 'T = CT·ρ·n²·D⁴');
+      R('实际推重比', null, c.perf.thrustToWeight, '', '');
+      R('目标推重比', 'twr', pw.twrTarget, '', '');
+      R('静态电流', null, pw.currentStatic, 'A', '峰值，用于选电调');
+      R('静态功率', null, pw.powerStatic, 'W', 'V×I', 0);
+      R('静态转速', null, pw.rpmStatic, 'rpm', '', 0);
+      R('桨距速度', null, pw.pitchSpeed, 'm/s', '高速段推力衰减界限', 1);
+      R('电调规格', null, pw.escA, 'A', '静态电流×1.25', 0);
+      G('续航');
+      R('巡航速度', null, pw.vCruise, 'm/s', '', 1);
+      R('巡航电流', null, pw.currentCruise, 'A', '', 1);
+      R('预计续航', null, pw.enduranceMin, 'min', '可用电量 80%', 0);
+      R('能量效率', null, pw.efficiency * 100, '%', '轴功率/电功率', 0);
+    } else if (rw) {
+      G('旋翼系统');
+      R('旋翼数量', null, rw.nrotor, '个', '');
+      R('单个旋翼直径', null, rw.rotorDia * 1000, 'mm', '', 0);
+      R('总桨盘面积', null, rw.diskArea, 'm²', '', 3);
+      R('桨盘载荷', null, rw.diskLoading, 'N/m²', 'DL = W/A_disk', 0);
+      R('桨叶弦长建议', null, rw.bladeChord * 1000, 'mm', '', 0);
+      G('功率与续航');
+      R('悬停轴功率', null, rw.powerHover, 'W', 'P = T^1.5/(FM·√(2ρA))', 0);
+      R('悬停电功率', null, rw.powerHoverElec, 'W', '', 0);
+      R('悬停电流', null, rw.currentHover, 'A', '', 1);
+      R('电池节数', null, rw.cells, 'S', '标称 ' + rw.batteryVoltage.toFixed(1) + ' V');
+      R('电池容量', 'capa', rw.capacity, 'mAh', '');
+      R('电调规格', null, rw.escA, 'A', '', 0);
+      R('预计续航', null, rw.enduranceMin, 'min', '', 1);
+    }
+  }
+
+  if (S.paramTab === 'perf') {
+    G('飞行性能');
+    if (!rw) {
+      R('失速速度', null, c.vStall, 'm/s', '');
+      R('最大速度', null, c.perf.vMaxCalc, 'm/s', '');
+      R('巡航速度', null, pw ? pw.vCruise : 0, 'm/s', '');
+      R('最大升阻比速度', null, c.vMd, 'm/s', '');
+      R('最大升阻比', null, c.ldMax, '', '', 1);
+      R('升阻比对应 CL', null, c.clMd, '', '', 3);
+      R('爬升率', null, c.perf.roc, 'm/s', '');
+      R('下沉率（无动力）', null, c.perf.sinkRate, 'm/s', '', 2);
+      R('盘旋半径', null, c.perf.turnRadius, 'm', '', 1);
+      R('可用推力', null, c.perf.thrustAvail, 'N', '', 2);
+    } else {
+      R('最大速度估计', null, rw.vMaxEstimate, 'm/s', '动量理论估计', 1);
+      R('推重比', null, rw.twrTarget, '', '', 2);
+      R('悬停功率', null, rw.powerHover, 'W', '', 0);
+    }
+    G('气动系数');
+    R('零升阻力 CD0', null, c.cd0, '', '', 4);
+    R('诱导阻力因子 k', null, c.kInduced, '', '', 4);
+    if (!rw) R('浸润面积', null, c.swet, 'm²', '', 3);
+  }
+
+  if (S.paramTab === 'struct') {
+    const st = c.structure;
+    G('结构与材料');
+    R('主体材料', null, st.materials, '', '');
+    R('设计过载', null, st.nLimit, 'G', '机动载荷系数');
+    R('安全系数', null, st.safetyFactor, '', '');
+    R('翼根极限弯矩', null, st.rootMoment, 'N·m', 'M=(W/S)(b/2)²/8·n·SF', 1);
+    R('主梁截面高度', null, st.sparH * 1000, 'mm', '', 1);
+    R('碳管主梁规格', null, 'φ' + st.sparDiaMM.toFixed(1), 'mm', '许用弯曲应力 900 MPa');
+    R('翼肋间距', null, st.ribSpacing * 1000, 'mm', '', 0);
+    G('舵机配置');
+    R('副翼舵机', null, st.servoAileron, 'kg·cm', '铰链力矩+经验下限', 1);
+    R('升降舵舵机', null, st.servoElevator, 'kg·cm', '', 1);
+    R('方向舵舵机', null, st.servoRudder, 'kg·cm', '', 1);
+  }
+
+  body.innerHTML = rows.join('');
+
+  body.querySelectorAll('[data-lock]').forEach(b => {
+    b.onclick = () => {
+      const k = b.dataset.lock;
+      if (S.locks[k] !== undefined) { delete S.locks[k]; }
+      else { S.locks[k] = p.values[k]; }
+      renderParams();
+    };
+  });
+  body.querySelectorAll('[data-edit]').forEach(inp => {
+    inp.onchange = () => {
+      const k = inp.dataset.edit;
+      const def = DesignEngine.ANCHOR_BY_ID[k];
+      let v = Number(inp.value);
+      if (!isFinite(v)) { renderParams(); return; }
+      if (def) v = clamp(v, def.min, def.max);
+      inp.value = v;
+      S.locks[k] = v;
+      renderParams();
+      toast('已锁定「' + (def ? def.label : k) + '」= ' + v, 'ok');
+    };
+  });
+}
+
+/* ---------- 约束校验 ---------- */
+function renderChecks() {
+  if (!S.result) return;
+  const p = S.result.top3[S.selected].plan;
+  const box = $('checkWrap');
+  const items = p.constraints || [];
+  const nE = items.filter(i => i.level === 'error').length;
+  const nW = items.filter(i => i.level === 'warn').length;
+  $('checkSum').innerHTML = nE
+    ? '<span class="badge err">' + nE + ' 项不通过</span>'
+    : (nW ? '<span class="badge warn">' + nW + ' 项警告</span>' : '<span class="badge ok">全部通过</span>');
+  box.innerHTML =
+    '<table class="checks"><thead><tr><th>结论</th><th>类别</th><th>检查项</th><th>实测</th><th>经验区间</th><th>说明</th></tr></thead><tbody>' +
+    items.map(it => {
+      const cls = it.level === 'error' ? 'err' : it.level === 'warn' ? 'warn' : '';
+      const badge = it.level === 'error' ? '<span class="badge err">不通过</span>'
+        : it.level === 'warn' ? '<span class="badge warn">警告</span>' : '<span class="badge ok">通过</span>';
+      return '<tr class="' + cls + '"><td>' + badge + '</td><td>' + it.cat + '</td><td>' + it.name +
+        '</td><td style="font-variant-numeric:tabular-nums">' + it.value + '</td><td class="pf">' + it.band +
+        '</td><td class="pf">' + it.msg + '</td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+/* ---------- 评分 ---------- */
+const SCORE_NOTE = {
+  stability:'静稳定裕度、尾容量、失速迎角、升阻比综合',
+  range:'最大升阻比、翼载、巡航功率综合',
+  speed:'可达最大速度、零升阻力、推重比综合',
+  cost:'功率规模、起飞重量、翼展综合（分越高越省）',
+  easyfly:'失速速度、翼载、稳定性、推重比综合',
+  buildability:'翼型厚度、展弦比、尺寸、翼肋间距综合'
+};
+function renderScores() {
+  if (!S.result) return;
+  const p = S.result.top3[S.selected].plan;
+  $('scoreTitle').innerHTML = '当前方案：<b style="color:var(--acc)">' + S.result.top3[S.selected].label +
+    '</b> · 综合 <b style="color:var(--gold)">' + p.score.total + '</b> / 100 · 锚点一致性 ' + p.score.consistency + '%';
+  $('scoreBars').innerHTML = p.score.dimensions.map(d =>
+    '<div class="scorerow"><span class="nm">' + d.name + '</span>' +
+    '<span class="bar"><i style="width:' + d.score + '%;background:' +
+      (d.score >= 75 ? 'linear-gradient(90deg,#39d98a,#4cc9f0)' :
+       d.score >= 50 ? 'linear-gradient(90deg,#f9c74f,#f8961e)' : 'linear-gradient(90deg,#ff5c72,#f8961e)') +
+    '"></i></span><span class="vl">' + d.score + '</span></div>' +
+    '<div class="hint" style="grid-column:2/-1;margin:-3px 0 4px">权重 ' + d.weight + ' · ' +
+    (SCORE_NOTE[d.key] || '') + '</div>').join('');
+  $('scoreNote').textContent = '评分 = Σ(权重 × 目标匹配度)/Σ权重，再按锚点一致性折减。同一机型下分数可直接横向比较。';
+  $('cardScore').style.display = '';
+}
+
+/* ---------- 推荐理由 ---------- */
+function renderReasons() {
+  if (!S.result) return;
+  const t = S.result.top3[S.selected];
+  $('reasonBody').innerHTML =
+    t.reasons.map((r, i) => '<div style="display:flex;gap:8px;margin-bottom:8px;font-size:12.5px;line-height:1.65">' +
+      '<span style="flex:none;width:18px;height:18px;border-radius:5px;background:rgba(76,201,240,.15);color:var(--acc);font-size:10.5px;display:grid;place-items:center;font-weight:700;margin-top:2px">' +
+      (i + 1) + '</span><span style="color:var(--tx2)">' + r + '</span></div>').join('') +
+    (t.warnings.length ? '<div class="sep"></div><div style="font-size:12px;color:var(--warn);font-weight:600;margin-bottom:6px">需要注意</div>' +
+      '<div class="warnlist">' + t.warnings.map(w => '<div class="warnitem">' + w + '</div>').join('') + '</div>'
+      : '<div class="sep"></div><div class="hint" style="color:var(--ok)">该方案无约束警告。</div>');
+}
+
+/* ---------- 对比表 ---------- */
+function renderCompare() {
+  if (!S.result) return;
+  const top3 = S.result.top3;
+  const rows = [
+    ['翼面积 (m²)', c => fmt(c.area, 3), 1],
+    ['翼展 (m)', c => fmt(c.span, 2), 0],
+    ['展弦比', c => fmt(c.ar, 2), 1],
+    ['翼载 (g/dm²)', c => fmt(c.wlGdm2, 0), 0],
+    ['翼型', c => (c.airfoil && c.airfoil.designation) || '—', 0],
+    ['失速速度 (m/s)', c => fmt(c.vStall, 1), 0],
+    ['最大速度 (m/s)', c => fmt(c.perf.vMaxCalc, 1), 1],
+    ['最大升阻比', c => fmt(c.ldMax, 1), 1],
+    ['静稳定裕度 (%MAC)', c => fmt(c.cg.staticMargin, 1), 0],
+    ['平尾容量 Vh', c => fmt(c.tail.vh, 3), 0],
+    ['推重比', c => fmt(c.perf.thrustToWeight, 2), 0],
+    ['动力配置', c => c.power ? (c.power.cells + 'S ' + c.power.motor + '/' + c.power.kv + ' ' + c.power.propIn + 'in')
+      : (c.rotary ? (c.rotary.nrotor + ' 旋翼 φ' + (c.rotary.rotorDia * 1000).toFixed(0) + 'mm') : '—'), 0],
+    ['静态推力 (N)', c => c.power ? fmt(c.power.staticThrust, 1) : '—', 0],
+    ['电调 (A)', c => c.power ? c.power.escA : (c.rotary ? c.rotary.escA : '—'), 0],
+    ['预计续航 (min)', c => c.power ? fmt(c.power.enduranceMin, 0) : fmt(c.rotary.enduranceMin, 0), 1],
+    ['碳管 (mm)', c => 'φ' + fmt(c.structure.sparDiaMM, 1), 0],
+    ['副翼舵机 (kg·cm)', c => fmt(c.structure.servoAileron, 1), 0],
+    ['警告数', function (c, t) { return t.plan.warnings.length; }, 1],
+    ['综合得分', function (c, t) { return t.plan.score.total; }, 1]
+  ];
+  let html = '<table class="cmp"><thead><tr><th>对比项</th>' +
+    top3.map(t => '<th>' + t.label + '</th>').join('') + '</tr></thead><tbody>';
+  rows.forEach(r => {
+    const vals = top3.map(t => r[1](t.plan.core, t));
+    const nums = vals.map(v => typeof v === 'number' ? v : parseFloat(v));
+    let bestIdx = -1;
+    if (r[2] !== undefined && nums.every(n => isFinite(n))) {
+      // 更低更好：警告数、翼载、电调
+      const lowerBetter = /警告|翼载|电调|碳管/.test(r[0]);
+      bestIdx = lowerBetter ? nums.indexOf(Math.min.apply(null, nums)) : nums.indexOf(Math.max.apply(null, nums));
+    }
+    html += '<tr><td>' + r[0] + '</td>' + vals.map((v, i) =>
+      '<td class="' + (i === bestIdx && top3.length > 1 ? 'best' : '') + '">' + v + '</td>').join('') + '</tr>';
+  });
+  html += '</tbody></table>';
+  $('cmpWrap').innerHTML = html;
+}
+
+/* ---------- 命名 ---------- */
+function renderNames(regen) {
+  if (!S.result) return;
+  const p = S.result.top3[S.selected].plan;
+  const type = DesignEngine.TYPE_BY_ID[S.result.typeId];
+  if (regen || !S.naming.candidates.length) {
+    S.naming.candidates = DesignEngine.generateNames(p, type, S.naming.batch || 0);
+    if (!S.naming.custom && !S.naming.skipped && !S.naming.name) S.naming.name = S.naming.candidates[0];
+  }
+  $('nameOut').textContent = S.naming.skipped ? '已跳过命名（不影响保存与导出）'
+    : (S.naming.name || '未命名（不影响保存与导出）');
+  $('nameOut').className = 'nameout' + ((S.naming.name && !S.naming.skipped) ? '' : ' empty');
+  $('nameCands').innerHTML = S.naming.candidates.map(n =>
+    '<span class="cand' + (n === S.naming.name ? ' on' : '') + '" data-n="' + n.replace(/"/g, '&quot;') + '">' + n + '</span>').join('');
+  $('nameCands').querySelectorAll('[data-n]').forEach(el => {
+    el.onclick = () => {
+      S.naming.name = el.dataset.n; S.naming.custom = false; S.naming.skipped = false;
+      renderNames(false); renderSnapshot();
+      toast('已采用：' + S.naming.name, 'ok');
+    };
+  });
+  $('nameCustom').value = S.naming.custom ? S.naming.name : '';
+}
+
+/* ---------- 快照 ---------- */
+function renderSnapshot() {
+  if (!S.snapshot) {
+    $('snapInfo').innerHTML = '方案尚未冻结。冻结后会生成带校验码的只读快照，导出 Excel 将包含该快照的全部信息。';
+    $('btnXlsx').disabled = true;
+    return;
+  }
+  const s = S.snapshot;
+  $('snapInfo').innerHTML =
+    '<span class="badge info">只读快照</span> ' +
+    '<span class="badge ok">' + (s.feasible ? '通过全部硬约束' : '存在硬约束冲突') + '</span><br>' +
+    '名称：<b style="color:var(--tx)">' + (s.name || '未命名') + '</b><br>' +
+    '机型：' + s.typeName + ' · 综合 ' + s.score.total + ' 分 · 置信度 ' + s.confidence + '%<br>' +
+    '校验码：<code>' + s.checksum + '</code><br>' +
+    '冻结时间：' + new Date(s.createdAt).toLocaleString('zh-CN');
+  $('btnXlsx').disabled = false;
+}
+
+function freezePlan() {
+  if (!S.result) { toast('请先生成方案', 'err'); return; }
+  const t = S.result.top3[S.selected];
+  S.versionHistory.push({
+    version: 'v' + (S.versionHistory.length + 1) + '.0',
+    time: new Date().toLocaleString('zh-CN'),
+    note: '冻结「' + t.label + '」方案' + (S.naming.name ? '，命名：' + S.naming.name : '')
+  });
+  S.snapshot = DesignEngine.snapshot(t.plan, {
+    name: S.naming.name, anchors: S.anchors, reasons: t.reasons,
+    dimensionInfo: S.result.dimensionInfo,
+    airfoilRecommendations: S.result.airfoilRecommendations,
+    lockedParams: S.locks,
+    versionHistory: S.versionHistory
+  });
+  S.frozen = true;
+  renderSnapshot();
+  toast('方案已冻结，校验码 ' + S.snapshot.checksum, 'ok');
+}
+
+function exportXlsx() {
+  if (!S.snapshot) { toast('请先点击「确定方案 · 生成只读快照」', 'err'); return; }
+  const t = S.result.top3[S.selected];
+  const payload = {
+    project: {
+      name: S.naming.name || (S.snapshot.typeName + ' 方案'),
+      createdAt: new Date().toLocaleString('zh-CN'),
+      version: DesignEngine.VERSION
+    },
+    snapshot: S.snapshot,
+    top3: S.result.top3,
+    anchors: S.anchors,
+    dimensionInfo: S.result.dimensionInfo,
+    airfoilRecommendations: S.result.airfoilRecommendations,
+    naming: S.naming,
+    versionHistory: S.versionHistory
+  };
+  try {
+    const size = XlsxExport.download(payload, (S.naming.name || '设计方案') + '.xlsx');
+    $('exportMsg').innerHTML = '<span style="color:var(--ok)">已导出 ' + (size / 1024).toFixed(1) +
+      ' KB，共 17 个工作表：封面 / 输入锚点 / 推荐方案 / 总体参数 / 翼型参数 / 机翼参数 / 尾翼参数 / 重心与稳定 / 动力系统 / 结构材料 / 约束校验 / 评分明细 / 推荐理由 / 方案对比 / 飞机命名 / 公式依赖 / 版本历史。</span>';
+    toast('Excel 已开始下载', 'ok');
+  } catch (e) {
+    console.error(e);
+    $('exportMsg').innerHTML = '<span style="color:var(--err)">导出失败：' + e.message + '</span>';
+    toast('导出失败：' + e.message, 'err');
+  }
+}
+
+/* =====================================================================
+ * 事件绑定
+ * =================================================================== */
+$('btnPlan').onclick = doPlan;
+$('btnAuto').onclick = () => { S.typeId = null; renderTypes(); renderAnchors(); doPlan(); toast('已切换为自动识别机型', 'ok'); };
+$('btnApply').onclick = () => {
+  const opts = {};
+  if (S.typeId) opts.typeId = S.typeId;
+  let res;
+  try {
+    res = DesignEngine.replan({}, Object.assign({}, S.anchors, S.locks), Object.assign(opts, {
+      locked: S.locks, airfoil: S.anchors.airfoil
+    }));
+  } catch (e) { toast('重算失败：' + e.message, 'err'); return; }
+  if (!res.ok) { toast(res.error, 'err'); return; }
+  S.result = res; S.selected = 0; S.snapshot = null; S.frozen = false;
+  renderDims(res); renderAirfoil(res); renderPlans(res); renderParams();
+  renderChecks(); renderScores(); renderReasons(); renderNames(false); renderSnapshot();
+  renderCompare();
+  $('hsConf').textContent = res.top3[0].plan.confidence + '%';
+  toast('已按锁定参数重新推荐', 'ok');
+};
+$('btnUnlock').onclick = () => {
+  S.locks = {};
+  renderParams();
+  toast('已解除全部锁定', 'ok');
+};
+$('btnAfApply').onclick = () => {
+  const v = $('afManual').value.trim();
+  const chk = AeroLib.parse(v);
+  if (!chk.valid) { $('afMsg').innerHTML = '<span style="color:var(--err)">' + chk.reason + '</span>'; return; }
+  $('afMsg').innerHTML = '<span style="color:var(--ok)">已识别：' + chk.series + '，厚度 ' +
+    (chk.tc * 100).toFixed(1) + '%，弯度 ' + (chk.camber * 100).toFixed(1) + '%</span>';
+  S.anchors.airfoil = v;
+  doPlan();
+};
+$('btnNameGen').onclick = () => { S.naming.batch = (S.naming.batch || 0) + 1; renderNames(true); renderSnapshot(); };
+$('btnNameOk').onclick = () => {
+  const v = $('nameCustom').value.trim();
+  if (!v) { toast('请输入自定义名称', 'err'); return; }
+  const chk = DesignEngine.validateName(v);
+  if (!chk.ok) { toast(chk.msg, 'err'); return; }
+  S.naming.name = v; S.naming.custom = true; S.naming.skipped = false;
+  renderNames(false); renderSnapshot(); toast('名称已采用：' + v, 'ok');
+};
+$('btnNameSkip').onclick = () => {
+  S.naming.skipped = true; S.naming.name = '';
+  renderNames(false); renderSnapshot(); toast('已跳过命名', 'ok');
+};
+$('btnFreeze').onclick = freezePlan;
+$('btnXlsx').onclick = exportXlsx;
+$('btnTop').onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+$('btnReset').onclick = () => { S.anchors = {}; S.anchorsConfirmed = false; renderAnchors(); toast('已清空锚点', 'ok'); };
+$('btnDemo').onclick = () => {
+  S.typeId = 'trainer';
+  S.anchors = { wl: 45, twr: 0.65, vmax: 20, span: 1.2 };
+  S.locks = {};
+  renderTypes(); renderAnchors(); doPlan();
+};
+
+/* 初始渲染 */
+renderTypes();
+renderDimTabs();
+renderAnchors();
+renderParamTabs();
+$('cardAf').style.display = 'none';
+// 默认载入示例，便于立即看到效果
+setTimeout(() => $('btnDemo').click(), 60);
+</script>
+</body>
+</html>
