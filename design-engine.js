@@ -36,7 +36,8 @@
       anchors: { ar: 6.0, wl: 45, twr: 0.65, vmax: 22, span: 1.2, mass: 1.2 },
       range: {
         ar: [4.5, 8.0], wl: [25, 65], twr: [0.45, 1.0], vmax: [14, 30], stall: [6, 12],
-        vh: [0.40, 0.70], vv: [0.030, 0.060], sm: [8, 20], re: [8e4, 4e5], pmax: [120, 320]
+        vh: [0.40, 0.70], vv: [0.030, 0.060], sm: [8, 20], re: [8e4, 4e5], pmax: [120, 320],
+        fus: [0.58, 0.82]      // 机身长度 / 翼展
       },
       weights: { stability: 1.35, range: 0.85, speed: 0.7, cost: 1.1, easyfly: 1.35, buildability: 1.15 },
       notes: '低速和缓、失速温和，重心容错大，适合入门与日常飞行。'
@@ -46,7 +47,8 @@
       anchors: { ar: 9.5, wl: 30, twr: 0.30, vmax: 16, span: 2.0, mass: 0.9 },
       range: {
         ar: [6.5, 16.0], wl: [15, 55], twr: [0.18, 0.70], vmax: [10, 26], stall: [4.5, 10],
-        vh: [0.38, 0.65], vv: [0.022, 0.055], sm: [6, 18], re: [6e4, 3e5], pmax: [60, 200]
+        vh: [0.38, 0.65], vv: [0.022, 0.055], sm: [6, 18], re: [6e4, 3e5], pmax: [60, 200],
+        fus: [0.46, 0.74]
       },
       weights: { stability: 1.1, range: 1.6, speed: 0.45, cost: 0.9, easyfly: 1.05, buildability: 0.95 },
       notes: '追求升阻比与低翼载，滞空时间长，起降依赖手抛或牵引。'
@@ -56,7 +58,8 @@
       anchors: { ar: 5.0, wl: 32, twr: 1.9, vmax: 24, span: 1.1, mass: 0.9 },
       range: {
         ar: [4.0, 6.5], wl: [20, 55], twr: [1.3, 2.8], vmax: [16, 32], stall: [5, 10],
-        vh: [0.42, 0.72], vv: [0.035, 0.070], sm: [2, 10], re: [5e4, 2.5e5], pmax: [400, 1200]
+        vh: [0.42, 0.72], vv: [0.035, 0.070], sm: [2, 10], re: [5e4, 2.5e5], pmax: [400, 1200],
+        fus: [0.66, 0.95]
       },
       weights: { stability: 0.75, range: 0.6, speed: 0.9, cost: 0.9, easyfly: 0.7, buildability: 1.0 },
       notes: '推重比 1.3 以上、舵面大、重心靠后，强调悬停与暴力机动。'
@@ -66,7 +69,8 @@
       anchors: { ar: 4.5, wl: 75, twr: 1.6, vmax: 42, span: 0.8, mass: 0.9 },
       range: {
         ar: [3.2, 6.0], wl: [50, 140], twr: [0.9, 2.6], vmax: [28, 70], stall: [10, 20],
-        vh: [0.35, 0.60], vv: [0.028, 0.055], sm: [5, 15], re: [1.5e5, 9e5], pmax: [400, 1500]
+        vh: [0.35, 0.60], vv: [0.028, 0.055], sm: [5, 15], re: [1.5e5, 9e5], pmax: [400, 1500],
+        fus: [0.62, 0.92]
       },
       weights: { stability: 1.0, range: 0.4, speed: 1.8, cost: 0.7, easyfly: 0.55, buildability: 0.85 },
       notes: '小展弦比薄翼、高翼载高功率，速度优先，低速特性苛刻。'
@@ -76,7 +80,8 @@
       anchors: { ar: 6.5, wl: 70, twr: 0.75, vmax: 20, span: 1.6, mass: 3.0 },
       range: {
         ar: [5.0, 9.5], wl: [45, 120], twr: [0.50, 1.1], vmax: [13, 28], stall: [8, 14],
-        vh: [0.42, 0.72], vv: [0.032, 0.062], sm: [8, 20], re: [1.2e5, 6e5], pmax: [110, 260]
+        vh: [0.42, 0.72], vv: [0.032, 0.062], sm: [8, 20], re: [1.2e5, 6e5], pmax: [110, 260],
+        fus: [0.55, 0.80]
       },
       weights: { stability: 1.25, range: 1.15, speed: 0.55, cost: 0.95, easyfly: 1.0, buildability: 1.2 },
       notes: '厚翼大翼面积、结构强，强调载荷能力与飞行稳定性。'
@@ -86,7 +91,8 @@
       anchors: { ar: 8.0, wl: 45, twr: 0.55, vmax: 19, span: 1.8, mass: 1.8 },
       range: {
         ar: [6.0, 12.0], wl: [28, 80], twr: [0.35, 0.95], vmax: [12, 28], stall: [6, 12],
-        vh: [0.40, 0.68], vv: [0.030, 0.058], sm: [8, 20], re: [1e5, 5e5], pmax: [90, 220]
+        vh: [0.40, 0.68], vv: [0.030, 0.058], sm: [8, 20], re: [1e5, 5e5], pmax: [90, 220],
+        fus: [0.50, 0.78]
       },
       weights: { stability: 1.15, range: 1.55, speed: 0.6, cost: 0.9, easyfly: 0.95, buildability: 1.0 },
       notes: '低翼载高升阻比，巡航效率优先，滞空时间最大化。'
@@ -151,7 +157,7 @@
     { id: 'vmax', label: '目标最大速度', unit: 'm/s', dim: 'performance', min: 6, max: 80, step: 0.5, def: 22 },
     { id: 'vstall', label: '目标失速速度', unit: 'm/s', dim: 'performance', min: 3, max: 22, step: 0.5, def: 8 },
     { id: 'endurance', label: '目标续航', unit: 'min', dim: 'performance', min: 2, max: 180, step: 1, def: 12 },
-    { id: 'style', label: '飞行风格', unit: '', dim: 'style', min: 1, max: 5, step: 1, kind: 'enum', rotaryOk: false,
+    { id: 'style', label: '飞行风格', unit: '', dim: 'style', min: 1, max: 5, step: 1, kind: 'enum', def: 3, rotaryOk: false,
       options: [{ v: 1, t: '1 极稳（慢速、容错优先）' }, { v: 2, t: '2 稳（练习/休闲）' }, { v: 3, t: '3 均衡（通用）' }, { v: 4, t: '4 灵活（特技倾向）' }, { v: 5, t: '5 激进（极限性能）' }] },
     { id: 'disk', label: '桨盘载荷', unit: 'N/m²', dim: 'performance', min: 30, max: 450, step: 5, def: 80, rotaryOnly: true },
     { id: 'nrotor', label: '旋翼数量', unit: '个', dim: 'geometry', min: 1, max: 8, step: 1, kind: 'int', def: 4, rotaryOnly: true }
@@ -688,7 +694,21 @@
     const mac = pf.mac, acMM = acPct * mac;
     const cgMM = cgPct * mac;
     staticMargin = (acPct - cgPct) * 100;
-    // 旋翼机型没有机翼-尾翼配平概念，这些字段不参与校验
+
+    // --- 机身长度 ---
+    // 由「机头 + 重心前机身 + 尾臂 + 平尾弦长」累加得到：
+    //   L = 0.35·cr（电机与电池舱） + h_cg·cr（机翼段，h_cg 为重心在 MAC 上的位置）
+    //       + lh（重心到平尾焦点的尾臂） + c_t（平尾平均弦长）
+    // 并以「机身长度 / 翼展」比值对照该机型的经验区间做合理性校验。
+    let fuselageLength = NaN, fusRatio = NaN, tailChordH = NaN, tailSpanH = NaN;
+    if (!o.rotary) {
+      const arTailH = clamp(AR * 0.55, 2.5, 6.0);
+      tailSpanH = Math.sqrt(Math.max(0.001, Sh) * arTailH);
+      tailChordH = tailSpanH > 0 ? Sh / tailSpanH : NaN;
+      fuselageLength = 0.35 * pf.root + cgPct * pf.root + lh + tailChordH;
+      fusRatio = fuselageLength / b;
+    }
+    // 旋翼机型：机身长度 ≈ 最大旋翼直径 × 1.05（机架需容纳桨盘）
     if (o.rotary) { acPct = null; cgPct = null; staticMargin = null; }
 
     // --- 动力系统 ---
@@ -787,6 +807,9 @@
         bladeChord: type.id === 'heli' ? (0.05 * rotorDia) : rotorDia * 0.12,
         escA: Math.max(20, Math.ceil((pElec / Math.max(4, inp.voltage || 14.8)) * 1.3 / 5) * 5)
       };
+      // 旋翼机型机身长度：机架需容纳桨盘，取最大旋翼直径的 1.05 倍
+      fuselageLength = rotorDia * 1.05;
+      fusRatio = fuselageLength / Math.max(0.01, b);
     }
 
     // --- 性能 ---
@@ -863,6 +886,8 @@
 
     return {
       planform: pf, ar: AR, span: b, area: S, taper: lambda, sweep: sweep, dihedral: dihedral, twist: twist,
+      meanChord: pf.meanChord, fuselageLength: fuselageLength, fuselageRatio: fusRatio,
+      tailChordH: tailChordH, tailSpanH: tailSpanH,
       airfoil: af, a3dPerDeg: a3dPerDeg, a3dPerDegDeg: a3dPerDegDeg, clMax3d: clMax3d,
       mass: m, weight: W, wingLoading: wingLoading, wlGdm2: wl, payload: payload,
       vStall: vStall, reStall: reStall, reCruise: reCruise, aStall3d: aStall3d,
@@ -936,6 +961,11 @@
       soft(core.tail.vv, R.vv, '经验', '垂尾容量 Vv', '', '垂尾容量偏小，航向稳定性不足', '垂尾容量偏大，垂尾阻力增加');
       soft(core.cg.staticMargin, R.sm, '经验', '静稳定裕度', ' %MAC', '静稳定裕度偏小，纵向易发散', '静稳定裕度偏大，俯仰配平阻力大、机动迟钝');
       soft(core.reCruise, R.re, '经验', '巡航雷诺数', '', '雷诺数偏低，翼型性能下降明显', '雷诺数偏高（超出模型常用范围）');
+      soft(core.fuselageRatio, R.fus, '经验', '机身长度 / 翼展', '', '机身偏短，尾力臂不足或设备舱拥挤', '机身偏长，结构重量与俯仰惯量增加');
+      if (isFinite(core.fuselageLength) && core.fuselageLength > 0) {
+        add('ok', '范围', '机身长度', round(core.fuselageLength * 1000, 0) + ' mm',
+          '按机头+机翼段+尾臂+平尾弦长累加', '机身长度已给出，用于绘制侧视图与布置设备');
+      }
     }
 
     // --- 交叉冲突 ---
@@ -1043,10 +1073,14 @@
     const completed = completeAnchors(input.anchors || {}, type, input.anchorKeys);
     const values = completed.values;
     const src = completed.source;
-    // 合并用户对派生参数的直接指定
+    // 合并用户对派生参数的直接指定；翼型同时兼容 opts.airfoil 与 anchors.airfoil 两种传入方式
     ['sweep', 'dihedral', 'twist', 'airfoil'].forEach(function (k) {
       if (input[k] !== undefined && input[k] !== null && input[k] !== '') values[k] = input[k];
     });
+    if ((values.airfoil === undefined || values.airfoil === '' || values.airfoil === null)
+      && input.anchors && input.anchors.airfoil) {
+      values.airfoil = input.anchors.airfoil;
+    }
 
     const ReEst = clamp(values.needCl ? values.mass : 1, 0, 1e6);
     const macGuess = isFinite(values.area) && isFinite(values.span) ? (2 / 3) * ((2 * values.area) / (values.span * 1.7)) * ((1 + 0.7 + 0.49) / 1.7) : 0.2;
@@ -1219,8 +1253,10 @@
 
     lines.push('机型判定为「' + type.name + '」，推理路径：' + inferred.path + '，置信度 ' + plan.confidence + '%。' + inferred.why);
     lines.push('总体：起飞重量 ' + round(c.mass, 2) + ' kg' + from('mass') + '，翼面积 ' + round(c.area, 3) + ' m²，翼展 '
-      + round(c.span, 3) + ' m，展弦比 ' + round(c.ar, 2) + '，梢根比 ' + round(c.taper, 2) + '，翼载 '
-      + round(c.wlGdm2, 1) + ' g/dm²。');
+      + round(c.span, 3) + ' m，机身长度 ' + round(c.fuselageLength * 1000, 0) + ' mm（L/b = '
+      + round(c.fuselageRatio, 2) + '），机翼弦长 ' + round(c.meanChord * 1000, 0) + ' mm（根弦 '
+      + round(c.planform.root * 1000, 0) + ' / 尖弦 ' + round(c.planform.tip * 1000, 0) + ' mm），展弦比 '
+      + round(c.ar, 2) + '，梢根比 ' + round(c.taper, 2) + '，翼载 ' + round(c.wlGdm2, 1) + ' g/dm²。');
     lines.push('翼型：' + af.designation + '（厚度 ' + round(af.tc * 100, 1) + '%、弯度 ' + round(af.camber * 100, 1)
       + '%、CLmax ' + round(af.clmax, 2) + '、CD0 ' + round(af.cd0 * 1e4, 0) + ' counts、失速迎角 ' + round(af.aStall, 1)
       + '°）。' + (af.notes || ''));
