@@ -459,7 +459,8 @@
       detail.push(pad([{ v: '◆ ' + t.label + '（' + t.tag + '）', style: S.subtitle }], 6));
       detail.push(pad(kv('选择依据', t.objectiveReason, ''), 6));
       detail.push(pad(kv('总体参数', '起飞 ' + num(x.mass) + ' kg｜翼面积 ' + num(x.area) + ' m²｜翼展 ' + num(x.span)
-        + ' m｜展弦比 ' + num(x.ar) + '｜梢根比 ' + num(x.taper), ''), 6));
+        + ' m｜机身长 ' + num(x.fuselageLength * 1000) + ' mm｜平均弦长 ' + num(x.meanChord * 1000)
+        + ' mm｜展弦比 ' + num(x.ar) + '｜梢根比 ' + num(x.taper)), 6));
       detail.push(pad(kv('气动性能', x.airfoil
         ? ('失速 ' + num(x.vStall) + ' m/s｜最大速度 ' + num(x.perf.vMaxCalc) + ' m/s｜L/D ' + num(x.ldMax)
           + '｜CLmax(3D) ' + num(x.clMax3d) + '｜翼型 ' + x.airfoil.designation)
@@ -504,6 +505,10 @@
         pad(kv('起飞重量', num(c.mass), 'kg', '用户锚点或由翼载反推'), 4),
         pad(kv('翼面积 S', num(c.area), 'm²', 'S = m·10 / wl[g/dm²]'), 4),
         pad(kv('翼展 b', num(c.span), 'm', 'b = √(AR·S)'), 4),
+        pad(kv('机身长度', num(c.fuselageLength * 1000), 'mm',
+          'L = 0.35·cr + h_cg·cr + lh + c_t（机头 + 机翼段 + 尾臂 + 平尾弦长）'), 4),
+        pad(kv('机身长度 / 翼展', num(c.fuselageRatio), '', '常规经验区间 0.55 ~ 0.85'), 4),
+        pad(kv('机翼平均弦长', num(c.meanChord * 1000), 'mm', 'c̄ = S / b'), 4),
         pad(kv('展弦比 AR', num(c.ar), '', 'AR = b² / S'), 4),
         pad(kv('梢根比 λ', num(c.taper), '', '尖弦 / 根弦'), 4),
         pad(kv('根弦 cr', num(c.planform && c.planform.root * 1000), 'mm', 'cr = 2S / (b(1+λ))'), 4),
@@ -569,12 +574,15 @@
         [],
         header(['参数', '数值', '单位', '说明', '', '']),
         pad(kv('翼型', af.designation || '—', '', ''), 4),
+        pad(kv('机身长度', num(c.fuselageLength * 1000), 'mm', '用于绘制侧视图与布置设备'), 4),
+        pad(kv('机身长度 / 翼展', num(c.fuselageRatio), '', '常规 0.55 ~ 0.85'), 4),
         pad(kv('翼展', num(c.span * 1000), 'mm', ''), 4),
         pad(kv('翼面积', num(c.area * 1e4), 'cm²', ''), 4),
         pad(kv('展弦比', num(c.ar), '', ''), 4),
         pad(kv('梢根比', num(c.taper), '', ''), 4),
-        pad(kv('根弦', num(c.planform && c.planform.root * 1000), 'mm', ''), 4),
-        pad(kv('尖弦', num(c.planform && c.planform.tip * 1000), 'mm', ''), 4),
+        pad(kv('平均弦长 c̄', num(c.meanChord * 1000), 'mm', 'c̄ = S / b'), 4),
+        pad(kv('根弦', num(c.planform && c.planform.root * 1000), 'mm', 'cr = 2S/(b(1+λ))'), 4),
+        pad(kv('尖弦', num(c.planform && c.planform.tip * 1000), 'mm', 'ct = λ·cr'), 4),
         pad(kv('平均气动弦 MAC', num(c.cg && c.cg.mac * 1000), 'mm', ''), 4),
         pad(kv('MAC 展向位置', num(c.planform && c.planform.yMac * 1000), 'mm', '距对称面'), 4),
         pad(kv('后掠角', num(c.sweep), '°', '1/4 弦线处'), 4),
@@ -792,6 +800,12 @@
 
     /* ---------- 14 方案对比 ---------- */
     const compareKeys = [
+      ['机身长度 (mm)', function (x) { return num(x.core.fuselageLength * 1000); }],
+      ['机身长度/翼展', function (x) { return num(x.core.fuselageRatio); }],
+      ['平均弦长 (mm)', function (x) { return num(x.core.meanChord * 1000); }],
+      ['根弦 (mm)', function (x) { return num(x.core.planform.root * 1000); }],
+      ['尖弦 (mm)', function (x) { return num(x.core.planform.tip * 1000); }],
+      ['MAC (mm)', function (x) { return num(x.core.cg.mac * 1000); }],
       ['起飞重量 (kg)', function (x) { return num(x.core.mass); }],
       ['翼面积 (m²)', function (x) { return num(x.core.area); }],
       ['翼展 (m)', function (x) { return num(x.core.span); }],
