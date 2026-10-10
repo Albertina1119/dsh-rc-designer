@@ -1285,6 +1285,92 @@
   }
 
   /* =======================================================================
+   * 12b. 全锚点取值汇总
+   *      把「用户锚点」与「引擎计算出的其余锚点」并列输出，
+   *      供界面锚点表与 Excel 的「输入锚点」表使用。
+   * ===================================================================== */
+  /**
+   * 返回全部锚点的最终取值与来源。
+   *   source: 'user'     用户勾选并输入的锚点（value 即用户输入值）
+   *           'engine'   引擎计算 / 择优得到的值（如桨径、电机 KV、续航等）
+   *           'baseline' 引擎沿用机型模板基线，未做改动
+   */
+  function anchorValues(plan) {
+    if (!plan || !plan.core) return [];
+    const c = plan.core, vals = plan.values || {}, src = plan.source || {};
+    const pw = c.power || null, rw = c.rotary || null;
+    const isNum = function (v) { return typeof v === 'number' && isFinite(v); };
+
+    // 每个锚点由「引擎算出」的取值
+    const computed = {
+      span: c.span,
+      area: c.area,
+      ar: c.ar,
+      taper: c.taper,
+      chord: c.meanChord,                          // 平均几何弦长 S/b
+      mass: c.mass,
+      wl: c.wlGdm2,
+      payload: isNum(c.payload) ? c.payload : vals.payload,
+      voltage: pw ? pw.voltage : (rw ? rw.batteryVoltage : vals.voltage),
+      kv: pw ? pw.kv : null,                       // 引擎实际选定的电机 KV
+      prop: pw ? pw.propIn : null,                 // 引擎实际选定的桨径 ← 文档举例
+      capa: pw ? pw.capacity : (rw ? rw.capacity : vals.capa),
+      twr: rw ? rw.twrTarget : (c.perf ? c.perf.thrustToWeight : vals.twr),
+      vmax: rw ? rw.vMaxEstimate : (c.perf ? c.perf.vMaxCalc : vals.vmax),
+      vstall: isNum(c.vStall) ? c.vStall : null,
+      endurance: pw ? pw.enduranceMin : (rw ? rw.enduranceMin : null),
+      style: vals.style,
+      disk: rw ? rw.diskLoading : null,
+      nrotor: rw ? rw.nrotor : null
+    };
+
+    // 补充说明：让用户知道这个值是怎么来的
+    const extra = {
+      prop: pw ? ('桨 ' + pw.propIn + '×' + pw.propPitch + ' in，' + (pw.autoSelected ? '引擎自动择优' : '用户指定')) : '',
+      kv: pw ? ((pw.motor || '') + ' 电机，' + (pw.autoSelected ? '引擎自动择优' : '用户指定')) : '',
+      chord: '平均几何弦长 c̄ = S / b',
+      wl: '翼载 = m[g] / S[dm²]',
+      twr: pw ? '实际静推力 / 起飞重量' : '目标推重比',
+      vmax: rw ? '动量理论估计值' : '推力与阻力曲线交点',
+      vstall: 'Vs = √(2W/(ρS·CLmax))',
+      endurance: '按可用电量 80% 估算',
+      area: 'S = m·10 / wl',
+      ar: 'AR = b² / S',
+      disk: 'DL = W / 总桨盘面积',
+      nrotor: rw ? (rw.kind === 'helicopter' ? '直升机主旋翼数' : '多旋翼数量') : '',
+      voltage: pw ? ('电池 ' + pw.cells + 'S') : (rw ? ('电池 ' + rw.cells + 'S') : ''),
+      capa: pw ? ('电池 ' + pw.cells + 'S / ' + pw.capacity + ' mAh') : (rw ? ('电池 ' + rw.cells + 'S / ' + rw.capacity + ' mAh') : '')
+    };
+
+    return ANCHORS.map(function (a) {
+      const isUser = src[a.id] === 'anchor';
+      const v = isUser ? vals[a.id] : computed[a.id];
+      const tpl = (TYPE_BY_ID[plan.typeId] || {}).anchors || {};
+      const near = function (x, y) { return isNum(x) && isNum(y) && Math.abs(x - y) <= 1e-9; };
+      // 三个来源：用户输入 / 引擎计算 / 模板默认
+      let source;
+      if (isUser) source = 'user';
+      else if (!isNum(v)) source = 'baseline';
+      else if (tpl[a.id] !== undefined ? near(v, tpl[a.id]) : near(v, a.def)) source = 'baseline';
+      else source = 'engine';
+      // 这些只可能由引擎算出，即使恰好等于默认值也标成 engine
+      if (!isUser && isNum(v) && ['prop', 'kv', 'chord', 'vstall', 'endurance', 'disk', 'nrotor'].indexOf(a.id) >= 0) {
+        source = 'engine';
+      }
+      return {
+        id: a.id, label: a.label, unit: a.unit, dim: a.dim,
+        dimName: (DIMENSIONS[a.dim] || {}).name || a.dim,
+        kind: a.kind || 'num',
+        value: isNum(v) ? v : null,
+        source: source,
+        note: extra[a.id] || '',
+        userAnchor: isUser,
+        options: a.options || null
+      };
+    }).filter(function (r) { return r.value !== null || r.userAnchor; });
+  }
+
+  /* =======================================================================
    * 13. 命名模块（非必填）
    * ===================================================================== */
   const NAME_WORDS = {
@@ -1384,6 +1470,8 @@
       ok: true, version: VERSION, typeId: type.id, typeName: type.name,
       inferred: inferred, candidatesEvaluated: cands.all.length, feasibleCount: cands.feasible.length,
       top3: plans, best: plans[0].plan, airfoilRecommendations: airfoilRec,
+      // 全锚点取值汇总（含引擎计算出的其余锚点，如桨径 / 电机 KV / 续航等）
+      anchorValues: anchorValues(plans[0].plan),
       dimensionInfo: (inferred ? inferred.dims : []).map(function (d) { return DIMENSIONS[d]; })
     };
   }
@@ -1455,6 +1543,7 @@
     ANCHORS: ANCHORS, ANCHOR_BY_ID: ANCHOR_BY_ID, DIMENSIONS: DIMENSIONS,
     OBJECTIVES: OBJECTIVES,
     inferType: inferType, completeAnchors: completeAnchors, computeCore: computeCore,
+    anchorValues: anchorValues,
     check: check, score: score, buildPlan: buildPlan, generateCandidates: generateCandidates,
     plan: plan, replan: replan, snapshot: snapshot,
     explain: explain, generateNames: generateNames, validateName: validateName,
