@@ -418,15 +418,43 @@
       return pad([{ v: k, style: S.label }, { v: num((best.values || {})[k]), style: S.num }, { v: '', style: S.note },
         { v: srcMap[best.source[k]] || best.source[k], style: S.value }], 6);
     });
+    // 全锚点一览：用户锚点 + 引擎计算出的其余锚点（文档要求）
+    let av = p.anchorValues;
+    if (!av && typeof DesignEngine !== 'undefined' && DesignEngine.anchorValues && best.core) {
+      av = DesignEngine.anchorValues(best);
+    }
+    av = av || [];
+    const srcLabel = { user: '用户输入', engine: '引擎计算', baseline: '模板默认' };
+    const avRows = av.map(function (r) {
+      const sty = r.source === 'user' ? S.value : (r.source === 'engine' ? S.key : S.note);
+      const cat = r.kind === 'enum' && r.options
+        ? ((r.options.filter(function (o) { return o.v === r.value; })[0] || {}).t || r.value)
+        : null;
+      return pad([
+        { v: r.label, style: S.label },
+        { v: cat !== null ? cat : num(r.value), style: S.num },
+        { v: r.unit || '', style: S.note },
+        { v: srcLabel[r.source] || r.source, style: sty },
+        { v: r.dimName || '', style: S.note },
+        { v: r.note || '', style: S.note }
+      ], 6);
+    });
+    const nUser = av.filter(function (r) { return r.source === 'user'; }).length;
+    const nEng = av.filter(function (r) { return r.source === 'engine'; }).length;
+    const nDft = av.filter(function (r) { return r.source === 'baseline'; }).length;
     defs.push({
       name: '输入锚点', freeze: 1,
-      cols: [{ w: 20 }, { w: 16 }, { w: 12 }, { w: 14 }, { w: 14 }, { w: 46 }],
+      cols: [{ w: 20 }, { w: 18 }, { w: 10 }, { w: 14 }, { w: 12 }, { w: 46 }],
       rows: [
-        pad([{ v: '一、输入锚点与维度识别', style: S.title }], 6),
+        pad([{ v: '一、输入锚点与引擎补全', style: S.title }], 6),
         [],
-        section('用户给定的数值锚点（2~4 个，覆盖至少 2 个维度）', 6),
-        header(['锚点', '数值', '单位', '维度', '来源', '说明'])
-      ].concat(anchorRows.length ? anchorRows : [pad([{ v: '（未指定锚点，全部由机型模板基线补全）', style: S.note }], 6)]).concat([
+        pad(kv('用户锚点', nUser, '项', '你勾选并输入的值', S.key), 4),
+        pad(kv('引擎计算', nEng, '项', '引擎算出或择优得到的值，如桨径、电机 KV、续航（可直接采用）', S.ok), 4),
+        pad(kv('模板默认', nDft, '项', '沿用该机型模板基线，未参与计算', S.note), 4),
+        [],
+        section('全部锚点一览（用户输入 + 引擎计算 + 模板默认）', 6),
+        header(['锚点', '数值', '单位', '来源', '维度', '说明'])
+      ].concat(avRows.length ? avRows : [pad([{ v: '（无锚点数据）', style: S.note }], 6)]).concat([
         [],
         section('识别到的维度', 6),
         header(['维度', '说明', '', '', '', ''])
@@ -434,8 +462,8 @@
         ? dims.map(function (d) { return pad([{ v: d.name, style: S.value }, { v: '用户锚点覆盖该维度', style: S.note }], 6); })
         : [pad([{ v: '（无）', style: S.note }], 6)]).concat([
         [],
-        section('参数补全来源（模板基线 + 规则库）', 6),
-        header(['参数', '最终取值', '单位', '来源', '', ''])
+        section('内部参数补全来源（模板基线 + 规则库）', 6),
+        header(['内部参数', '最终取值', '单位', '来源', '', ''])
       ]).concat(srcRows)
     });
 
@@ -476,8 +504,7 @@
           + ' in｜静推力 ' + num(px.staticThrust) + ' N｜静态电流 ' + num(px.currentStatic) + ' A｜电调 ' + px.escA
           + ' A｜续航约 ' + num(px.enduranceMin) + ' min')
         : (rx ? (rx.nrotor + ' 旋翼｜单桨 φ' + num(rx.rotorDia * 1000) + ' mm｜桨盘载荷 ' + num(rx.diskLoading)
-          + ' N/m²｜悬停功率 ' + num(rx.powerHover) + ' W｜续航约 ' + num(rx.enduranceMin) + ' min') : '—'), ''), 6));
-      detail.push(pad(kv('结构', x.structure.materials + '｜碳管 φ' + num(x.structure.sparDiaMM) + ' mm｜翼肋间距 '
+          + ' N/m²｜悬停功率 ' + num(rx.powerHover) + ' W｜续航约 ' + num(rx.enduranceMin) + ' min') : '—'), ''), 6));      detail.push(pad(kv('结构', x.structure.materials + '｜碳管 φ' + num(x.structure.sparDiaMM) + ' mm｜翼肋间距 '
         + num(x.structure.ribSpacing * 1000) + ' mm｜副翼舵机 ' + num(x.structure.servoAileron) + ' kg·cm', ''), 6));
       detail.push(pad(kv('评分', t.plan.score.dimensions.map(function (d) { return d.name + ' ' + d.score; }).join('｜')
         + '｜总计 ' + t.plan.score.total, ''), 6));
