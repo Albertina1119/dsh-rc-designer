@@ -361,7 +361,11 @@
     const tip = root * lambda;
     const mac = (2 / 3) * root * ((1 + lambda + lambda * lambda) / (1 + lambda));
     const yMac = (span / 6) * ((1 + 2 * lambda) / (1 + lambda));
-    return { span: span, area: area, ar: (span * span) / area, taper: lambda, root: root, tip: tip, mac: mac, yMac: yMac };
+    return {
+      span: span, area: area, ar: (span * span) / area, taper: lambda,
+      root: root, tip: tip, mac: mac, yMac: yMac,
+      meanChord: area / span            // 平均几何弦长 c̄ = S / b
+    };
   }
   /** 尾容量 Vh = Sh·lh/(S·MAC)，Vv = Sv·lv/(S·b) */
   function tailVolume(Sh, Sv, lh, lv, S, mac, span) {
