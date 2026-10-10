@@ -329,6 +329,9 @@ table.cmp td.best{color:var(--ok);font-weight:700}
           <input type="text" id="afManual" placeholder="如 2412 / 23012 / 65-210" spellcheck="false">
           <button class="btn sm" id="btnAfApply">应用</button>
         </div>
+        <div class="btnrow" style="margin-top:7px">
+          <button class="btn sm ghost" id="btnAfAuto" style="flex:1">恢复自动推荐</button>
+        </div>
         <div class="hint" id="afMsg" style="margin-top:6px"></div>
       </div>
     </div>
@@ -555,11 +558,7 @@ function renderAnchors() {
       const k = cb.dataset.k;
       const def = DesignEngine.ANCHOR_BY_ID[k];
       if (cb.checked) {
-        if (Object.keys(S.anchors).length >= 4) {
-          cb.checked = false;
-          toast('最多只能选 4 个数值锚点', 'err');
-          return;
-        }
+        // 锚点数量不设上限：勾选多少个都可以，越多越精确
         S.anchors[k] = def.def;
       } else {
         delete S.anchors[k];
@@ -586,14 +585,14 @@ function renderAnchors() {
 function updateAnchorHint() {
   const keys = Object.keys(S.anchors);
   const n = keys.length;
-  $('anchorCount').textContent = n + ' / 2~4';
+  $('anchorCount').textContent = n + ' 个（不限上限）';
   const dims = new Set(keys.map(k => DesignEngine.ANCHOR_BY_ID[k].dim));
-  const okN = n >= 2 && n <= 4;
+  const okN = n >= 2;
   const okD = dims.size >= 2;
   $('btnPlan').disabled = !(okN && okD);
   let msg;
-  if (n === 0) msg = '请勾选 2~4 个锚点。锚点越贴近性能指标（翼载 / 推重比 / 速度 / 展弦比），推荐越准。';
-  else if (!okN) msg = n < 2 ? '还需再选 ' + (2 - n) + ' 个锚点。' : '最多 4 个锚点，请取消 ' + (n - 4) + ' 个。';
+  if (n === 0) msg = '请勾选锚点（至少 2 个，数量不设上限）。锚点越贴近性能指标（翼载 / 推重比 / 速度 / 展弦比），推荐越准。';
+  else if (!okN) msg = '还需再选 ' + (2 - n) + ' 个锚点（至少 2 个）。';
   else if (!okD) msg = '当前锚点都落在「' + DesignEngine.DIMENSIONS[DesignEngine.ANCHOR_BY_ID[keys[0]].dim].name +
     '」一个维度，请再覆盖至少 1 个其他维度。';
   else msg = '已选 ' + n + ' 个锚点，覆盖 ' + dims.size + ' 个维度（' +
@@ -613,6 +612,8 @@ function autoPlan() {
 function doPlan() {
   const opts = {};
   if (S.typeId) opts.typeId = S.typeId;
+  // 关键：把手动指定 / 点选的翼型传给引擎，否则翼型不会生效
+  if (S.anchors.airfoil) opts.airfoil = S.anchors.airfoil;
   if (Object.keys(S.locks).length) {
     // 锁定项以锚点形式回灌
     Object.keys(S.locks).forEach(k => {
@@ -716,7 +717,9 @@ function renderPlans(res) {
       ['起飞重量', fmt(c.mass, 2), 'kg'],
       ['翼面积', fmt(c.area, 3), 'm²'],
       ['翼展', fmt(c.span, 2), 'm'],
+      ['机身长度', fmt(c.fuselageLength, 2), 'm'],
       ['展弦比', fmt(c.ar, 2), ''],
+      ['平均弦长', fmt(c.meanChord * 1000, 0), 'mm'],
       ['翼载', fmt(c.wlGdm2, 0), 'g/dm²'],
       c.rotary ? ['桨盘载荷', fmt(c.rotary.diskLoading, 0), 'N/m²'] : ['失速速度', fmt(c.vStall, 1), 'm/s'],
       c.rotary ? ['续航', fmt(c.rotary.enduranceMin, 0), 'min'] : ['最大速度', fmt(c.perf.vMaxCalc, 1), 'm/s'],
@@ -817,6 +820,14 @@ function renderParams() {
     R('起飞重量', 'mass', c.mass, 'kg', 'W = m·g');
     R('翼面积 S', 'area', c.area, 'm²', 'S = m·10 / wl');
     R('翼展 b', 'span', c.span, 'm', 'b = √(AR·S)');
+    R('机身长度', null, c.fuselageLength, 'm', c.rotary
+      ? '按桨盘直径 × 1.05 估算机架长度'
+      : 'L = 0.35·cr + h_cg·cr + lh + c_t（机头+机翼段+尾臂+平尾弦长）', 3);
+    R('机身长度 / 翼展', null, c.fuselageRatio, '', c.rotary ? '旋翼机型参考值' : '常规经验区间 0.55 ~ 0.85', 2);
+    R('机翼平均弦长', null, c.meanChord * 1000, 'mm', 'c̄ = S / b', 0);
+    R('机翼根弦', null, c.planform.root * 1000, 'mm', 'cr = 2S/(b(1+λ))', 0);
+    R('机翼尖弦', null, c.planform.tip * 1000, 'mm', 'ct = λ·cr', 0);
+    R('平均气动弦 MAC', null, c.cg.mac * 1000, 'mm', '用于重心定位与雷诺数', 0);
     R('展弦比 AR', 'ar', c.ar, '', 'AR = b²/S');
     R('梢根比 λ', 'taper', c.taper, '', '尖弦/根弦');
     R('翼载', null, c.wlGdm2, 'g/dm²', 'wl = m[g]/S[dm²]', 1);
@@ -842,16 +853,21 @@ function renderParams() {
   }
 
   if (S.paramTab === 'geom' && !rw) {
+    G('机身');
+    R('机身长度', null, c.fuselageLength * 1000, 'mm', '机头 + 机翼段 + 尾臂 + 平尾弦长', 0);
+    R('机身长度 / 翼展', null, c.fuselageRatio, '', '常规 0.55 ~ 0.85', 2);
+    G('机翼弦长');
+    R('平均弦长 c̄', null, c.meanChord * 1000, 'mm', 'c̄ = S / b', 0);
+    R('根弦 cr', null, c.planform.root * 1000, 'mm', 'cr = 2S/(b(1+λ))', 0);
+    R('尖弦 ct', null, c.planform.tip * 1000, 'mm', 'ct = λ·cr', 0);
+    R('平均气动弦 MAC', null, c.cg.mac * 1000, 'mm', '(2/3)·cr·(1+λ+λ²)/(1+λ)', 0);
+    R('MAC 展向位置', null, c.planform.yMac * 1000, 'mm', '距对称面', 0);
     G('机翼平面形状');
     R('翼型', null, af.designation || '—', '', af.notes || '');
     R('翼面积', 'area', c.area, 'm²', '');
     R('翼展', 'span', c.span, 'm', '');
     R('展弦比', 'ar', c.ar, '', '');
     R('梢根比', 'taper', c.taper, '', '');
-    R('根弦', null, c.planform.root * 1000, 'mm', 'cr = 2S/(b(1+λ))', 0);
-    R('尖弦', null, c.planform.tip * 1000, 'mm', 'ct = λ·cr', 0);
-    R('平均气动弦 MAC', null, c.cg.mac * 1000, 'mm', '', 0);
-    R('MAC 展向位置', null, c.planform.yMac * 1000, 'mm', '距对称面', 0);
     R('后掠角', null, c.sweep, '°', '1/4 弦线');
     R('上反角', null, c.dihedral, '°', '');
     R('扭转角', null, c.twist, '°', '正值为根部抬头');
@@ -1086,6 +1102,12 @@ function renderCompare() {
   if (!S.result) return;
   const top3 = S.result.top3;
   const rows = [
+    ['机身长度 (m)', c => fmt(c.fuselageLength, 3), 1],
+    ['机身长度/翼展', c => fmt(c.fuselageRatio, 2), 0],
+    ['平均弦长 (mm)', c => fmt(c.meanChord * 1000, 0), 0],
+    ['根弦 (mm)', c => fmt(c.planform.root * 1000, 0), 0],
+    ['尖弦 (mm)', c => fmt(c.planform.tip * 1000, 0), 0],
+    ['MAC (mm)', c => fmt(c.cg.mac * 1000, 0), 0],
     ['翼面积 (m²)', c => fmt(c.area, 3), 1],
     ['翼展 (m)', c => fmt(c.span, 2), 0],
     ['展弦比', c => fmt(c.ar, 2), 1],
@@ -1245,12 +1267,28 @@ $('btnUnlock').onclick = () => {
 };
 $('btnAfApply').onclick = () => {
   const v = $('afManual').value.trim();
+  if (!v) { $('afMsg').innerHTML = '<span style="color:var(--err)">请先输入 NACA 编号</span>'; return; }
   const chk = AeroLib.parse(v);
   if (!chk.valid) { $('afMsg').innerHTML = '<span style="color:var(--err)">' + chk.reason + '</span>'; return; }
-  $('afMsg').innerHTML = '<span style="color:var(--ok)">已识别：' + chk.series + '，厚度 ' +
-    (chk.tc * 100).toFixed(1) + '%，弯度 ' + (chk.camber * 100).toFixed(1) + '%</span>';
-  S.anchors.airfoil = v;
+  const norm = 'NACA ' + chk.code;
+  S.anchors.airfoil = norm;
   doPlan();
+  // doPlan 完成后确认翼型确实已生效（读取实际计算结果，而不是只改输入框）
+  const applied = S.result && S.result.best && S.result.best.core.airfoil
+    ? S.result.best.core.airfoil.designation : '';
+  const okApplied = applied && applied.replace(/\s+/g, '').indexOf(chk.code) >= 0;
+  $('afMsg').innerHTML = okApplied
+    ? '<span style="color:var(--ok)">✓ 已应用 ' + applied + '（厚度 ' + (chk.tc * 100).toFixed(1) +
+      '%，弯度 ' + (chk.camber * 100).toFixed(1) + '%）并已重新计算方案</span>'
+    : '<span style="color:var(--warn)">已提交 ' + norm + '，但引擎未采用，请检查编号或查看下方参数</span>';
+  toast(okApplied ? '翼型已应用：' + applied : '翼型未生效', okApplied ? 'ok' : 'err');
+};
+$('btnAfAuto').onclick = () => {
+  delete S.anchors.airfoil;
+  $('afManual').value = '';
+  doPlan();
+  $('afMsg').innerHTML = '<span style="color:var(--ok)">✓ 已恢复自动推荐，翼型由引擎按机型 / 雷诺数 / 升力需求择优</span>';
+  toast('已恢复自动推荐翼型', 'ok');
 };
 $('btnNameGen').onclick = () => { S.naming.batch = (S.naming.batch || 0) + 1; renderNames(true); renderSnapshot(); };
 $('btnNameOk').onclick = () => {
