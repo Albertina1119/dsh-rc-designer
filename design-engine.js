@@ -1081,6 +1081,12 @@
       && input.anchors && input.anchors.airfoil) {
       values.airfoil = input.anchors.airfoil;
     }
+    // 兜底清洗：把「NACA NACA 2412」「naca2412」之类统一成「NACA 2412」，
+    // 避免因为前缀重复而查不到翼型、导致整套气动数据变成 NaN。
+    if (values.airfoil !== undefined && values.airfoil !== null && values.airfoil !== '') {
+      const bare = String(values.airfoil).replace(/^\s*(NACA\s*)+/i, '').replace(/\s+/g, '').trim();
+      values.airfoil = 'NACA ' + bare;
+    }
 
     const ReEst = clamp(values.needCl ? values.mass : 1, 0, 1e6);
     const macGuess = isFinite(values.area) && isFinite(values.span) ? (2 / 3) * ((2 * values.area) / (values.span * 1.7)) * ((1 + 0.7 + 0.49) / 1.7) : 0.2;
@@ -1100,6 +1106,11 @@
       sweep: input.sweep, dihedral: input.dihedral, twist: input.twist,
       rotary: !!type.rotary, source: src
     });
+    // 若指定的翼型编号没被识别、临时替换成了 NACA 2412，必须明确告知用户
+    if (af && af.substituted) {
+      core.airfoilWarning = '翼型编号「' + values.airfoil + '」无法识别（' + (af.reason || '') +
+        '），本次已临时按 NACA 2412 计算。请改用 4 位（2412）、5 位（23012）或 6 位（65-210）编号。';
+    }
     const constraints = check(core, type);
     const fails = hardFails(constraints);
     const warnings = constraints.filter(function (i) { return i.level === 'warn'; });
@@ -1123,10 +1134,15 @@
     })();
 
     const sc = score(core, type, cons);
+    // 翼型编号无法识别时的警告，进入统一警告列表，界面与 Excel 都能看到
+    const allWarnings = warnings.slice();
+    if (core.airfoilWarning) {
+      allWarnings.unshift({ name: '翼型', msg: core.airfoilWarning, level: 'warn' });
+    }
     return {
       typeId: type.id, typeName: type.name, seed: seedInfo || null,
       values: values, source: src, core: core, constraints: constraints,
-      errors: fails, warnings: warnings, score: sc,
+      errors: fails, warnings: allWarnings, score: sc,
       feasible: fails.length === 0,
       confidence: clamp(Math.round(seedInfo && seedInfo.confidence ? seedInfo.confidence : 80), 20, 98)
     };
