@@ -1346,7 +1346,8 @@ $('btnAfApply').onclick = () => {
   if (!v) { $('afMsg').innerHTML = '<span style="color:var(--err)">请先输入 NACA 编号</span>'; return; }
   const chk = AeroLib.parse(v);
   if (!chk.valid) { $('afMsg').innerHTML = '<span style="color:var(--err)">' + chk.reason + '</span>'; return; }
-  const norm = 'NACA ' + chk.code;
+  // 统一成「NACA 2412」形式：先剥掉已有的 NACA 前缀（含重复），再加一个
+  const norm = 'NACA ' + String(chk.code || v).replace(/^\s*(NACA\s*)+/i, '').replace(/\s+/g, ' ').trim();
   S.anchors.airfoil = norm;
   doPlan();
   // doPlan 完成后确认翼型确实已生效（读取实际计算结果，而不是只改输入框）
