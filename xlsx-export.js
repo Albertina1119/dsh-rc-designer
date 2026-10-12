@@ -366,6 +366,47 @@
     const rec = p.airfoilRecommendations || [];
     const defs = [];
 
+    /* ---------- 全锚点取值：用户给定 vs 引擎推荐（封面与「输入锚点」表共用） ---------- */
+    let av = p.anchorValues;
+    if (!av && typeof DesignEngine !== 'undefined' && DesignEngine.anchorValues && best.core) {
+      av = DesignEngine.anchorValues(best);
+    }
+    av = av || [];
+    const srcLabel = { user: '用户锚点（已采用）', engine: '引擎推荐', baseline: '模板默认' };
+    const srcStyle = function (r) { return r.source === 'user' ? S.value : (r.source === 'engine' ? S.key : S.note); };
+    const enumText = function (r) {
+      return r.kind === 'enum' && r.options
+        ? (((r.options.filter(function (o) { return o.v === r.value; })[0] || {}).t) || r.value)
+        : null;
+    };
+    const avRec = function (r) { const t = enumText(r); return t !== null ? t : num(r.value); };
+    // 封面：6 列（省略「说明」，保持封面简洁）
+    const avRow6 = function (r) {
+      return pad([
+        { v: r.label, style: S.label },
+        { v: r.userAnchor ? avRec(r) : '—', style: r.userAnchor ? S.num : S.note },
+        { v: avRec(r), style: S.key },
+        { v: r.unit || '', style: S.note },
+        { v: srcLabel[r.source] || r.source, style: srcStyle(r) },
+        { v: r.dimName || '', style: S.note }
+      ], 6);
+    };
+    // 「输入锚点」表：7 列（含说明）
+    const avRow7 = function (r) {
+      return pad([
+        { v: r.label, style: S.label },
+        { v: r.userAnchor ? avRec(r) : '—', style: r.userAnchor ? S.num : S.note },
+        { v: avRec(r), style: S.key },
+        { v: r.unit || '', style: S.note },
+        { v: srcLabel[r.source] || r.source, style: srcStyle(r) },
+        { v: r.dimName || '', style: S.note },
+        { v: (r.note || '') + (r.userAnchor ? '　（已按你的输入采用）' : ''), style: S.note }
+      ], 7);
+    };
+    const nUser = av.filter(function (r) { return r.source === 'user'; }).length;
+    const nEng = av.filter(function (r) { return r.source === 'engine'; }).length;
+    const nDft = av.filter(function (r) { return r.source === 'baseline'; }).length;
+
     /* ---------- 1 封面 ---------- */
     defs.push({
       name: '封面', freeze: 0,
@@ -384,7 +425,7 @@
         pad(kv('置信度', best.confidence != null ? best.confidence + '%' : '—', '受锚点数量与机型匹配度影响'), 6),
         [],
         section('关键结论', 6),
-        header(['总体', '数值', '单位', '总体', '数值', '单位']),
+        header(['总体', '推荐数值', '单位', '总体', '推荐数值', '单位']),
         pad([{ v: '起飞重量', style: S.label }, { v: num(c.mass), style: S.num }, { v: 'kg', style: S.note },
           { v: '翼载', style: S.label }, { v: num(c.wlGdm2), style: S.num }, { v: 'g/dm²', style: S.note }], 6),
         pad([{ v: '翼面积', style: S.label }, { v: num(c.area), style: S.num }, { v: 'm²', style: S.note },
@@ -397,8 +438,18 @@
           { v: '推重比', style: S.label }, { v: num(c.perf && c.perf.thrustToWeight), style: S.num }, { v: '', style: S.note }], 6),
         pad([{ v: '旋翼', style: S.label },
           { v: isRotary ? (rw.nrotor + ' × φ' + num(rw.rotorDia * 1000) + ' mm') : '—', style: S.value }, { v: '', style: S.note },
-          { v: '桨盘载荷', style: S.label }, { v: isRotary ? num(rw.diskLoading) : '—', style: S.num }, { v: 'N/m²', style: S.note }], 6)
-      ]
+          { v: '桨盘载荷', style: S.label }, { v: isRotary ? num(rw.diskLoading) : '—', style: S.num }, { v: 'N/m²', style: S.note }], 6),
+        [],
+        section('输入锚点：你给定的值  vs  引擎推荐的值', 6),
+        pad(kv('你给定', nUser, '项', '勾选并输入，引擎已按此采用', S.key), 4),
+        pad(kv('引擎推荐', nEng, '项', '引擎算出或择优得到的推荐值，可直接采用', S.ok), 4),
+        pad(kv('模板默认', nDft, '项', '沿用机型模板基线，未参与计算', S.note), 4),
+        header(['锚点', '用户给定', '推荐数值', '单位', '来源', '维度'])
+      ].concat(av.map(avRow6)).concat([
+        [],
+        pad([{ v: '说明：某一项「用户给定」为空（—）时，右侧「推荐数值」就是引擎给出的推荐值；' +
+          '两者都有值时说明引擎已按你的输入采用。完整说明见「输入锚点」工作表。', style: S.note }], 6)
+      ])
     });
 
     /* ---------- 2 输入锚点 ---------- */
@@ -418,36 +469,8 @@
       return pad([{ v: k, style: S.label }, { v: num((best.values || {})[k]), style: S.num }, { v: '', style: S.note },
         { v: srcMap[best.source[k]] || best.source[k], style: S.value }], 6);
     });
-    // 全锚点一览：用户给定值 与 引擎推荐值 分列并列（同一个锚点既看输入也看推荐）
-    let av = p.anchorValues;
-    if (!av && typeof DesignEngine !== 'undefined' && DesignEngine.anchorValues && best.core) {
-      av = DesignEngine.anchorValues(best);
-    }
-    av = av || [];
-    const srcLabel = { user: '用户锚点（已采用）', engine: '引擎推荐', baseline: '模板默认' };
-    const avRows = av.map(function (r) {
-      const sty = r.source === 'user' ? S.value : (r.source === 'engine' ? S.key : S.note);
-      const isEnum = r.kind === 'enum' && r.options;
-      const cat = isEnum
-        ? ((r.options.filter(function (o) { return o.v === r.value; })[0] || {}).t || r.value)
-        : null;
-      const rec = cat !== null ? cat : num(r.value);
-      // 用户给定列：勾选的锚点显示用户输入值；未勾选的显示「—」
-      const given = r.userAnchor ? (cat !== null ? cat : num(r.value)) : '—';
-      const isSame = r.userAnchor;
-      return pad([
-        { v: r.label, style: S.label },
-        { v: given, style: isSame ? S.num : S.note },
-        { v: rec, style: S.key },                       // ← 推荐数值列
-        { v: r.unit || '', style: S.note },
-        { v: srcLabel[r.source] || r.source, style: sty },
-        { v: r.dimName || '', style: S.note },
-        { v: (r.note || '') + (isSame ? '　（已按你的输入采用）' : ''), style: S.note }
-      ], 7);
-    });
-    const nUser = av.filter(function (r) { return r.source === 'user'; }).length;
-    const nEng = av.filter(function (r) { return r.source === 'engine'; }).length;
-    const nDft = av.filter(function (r) { return r.source === 'baseline'; }).length;
+    // 全锚点一览：用户给定值 与 引擎推荐值 分列并列（复用封面已算好的 av）
+    const avRows = av.map(avRow7);
     defs.push({
       name: '输入锚点', freeze: 1,
       cols: [{ w: 20 }, { w: 18 }, { w: 20 }, { w: 10 }, { w: 18 }, { w: 10 }, { w: 44 }],
