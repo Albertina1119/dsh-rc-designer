@@ -418,53 +418,59 @@
       return pad([{ v: k, style: S.label }, { v: num((best.values || {})[k]), style: S.num }, { v: '', style: S.note },
         { v: srcMap[best.source[k]] || best.source[k], style: S.value }], 6);
     });
-    // 全锚点一览：用户锚点 + 引擎计算出的其余锚点（文档要求）
+    // 全锚点一览：用户给定值 与 引擎推荐值 分列并列（同一个锚点既看输入也看推荐）
     let av = p.anchorValues;
     if (!av && typeof DesignEngine !== 'undefined' && DesignEngine.anchorValues && best.core) {
       av = DesignEngine.anchorValues(best);
     }
     av = av || [];
-    const srcLabel = { user: '用户输入', engine: '引擎计算', baseline: '模板默认' };
+    const srcLabel = { user: '用户锚点（已采用）', engine: '引擎推荐', baseline: '模板默认' };
     const avRows = av.map(function (r) {
       const sty = r.source === 'user' ? S.value : (r.source === 'engine' ? S.key : S.note);
-      const cat = r.kind === 'enum' && r.options
+      const isEnum = r.kind === 'enum' && r.options;
+      const cat = isEnum
         ? ((r.options.filter(function (o) { return o.v === r.value; })[0] || {}).t || r.value)
         : null;
+      const rec = cat !== null ? cat : num(r.value);
+      // 用户给定列：勾选的锚点显示用户输入值；未勾选的显示「—」
+      const given = r.userAnchor ? (cat !== null ? cat : num(r.value)) : '—';
+      const isSame = r.userAnchor;
       return pad([
         { v: r.label, style: S.label },
-        { v: cat !== null ? cat : num(r.value), style: S.num },
+        { v: given, style: isSame ? S.num : S.note },
+        { v: rec, style: S.key },                       // ← 推荐数值列
         { v: r.unit || '', style: S.note },
         { v: srcLabel[r.source] || r.source, style: sty },
         { v: r.dimName || '', style: S.note },
-        { v: r.note || '', style: S.note }
-      ], 6);
+        { v: (r.note || '') + (isSame ? '　（已按你的输入采用）' : ''), style: S.note }
+      ], 7);
     });
     const nUser = av.filter(function (r) { return r.source === 'user'; }).length;
     const nEng = av.filter(function (r) { return r.source === 'engine'; }).length;
     const nDft = av.filter(function (r) { return r.source === 'baseline'; }).length;
     defs.push({
       name: '输入锚点', freeze: 1,
-      cols: [{ w: 20 }, { w: 18 }, { w: 10 }, { w: 14 }, { w: 12 }, { w: 46 }],
+      cols: [{ w: 20 }, { w: 18 }, { w: 20 }, { w: 10 }, { w: 18 }, { w: 10 }, { w: 44 }],
       rows: [
-        pad([{ v: '一、输入锚点与引擎补全', style: S.title }], 6),
+        pad([{ v: '一、输入锚点与引擎推荐', style: S.title }], 7),
         [],
-        pad(kv('用户锚点', nUser, '项', '你勾选并输入的值', S.key), 4),
-        pad(kv('引擎计算', nEng, '项', '引擎算出或择优得到的值，如桨径、电机 KV、续航（可直接采用）', S.ok), 4),
+        pad(kv('用户锚点', nUser, '项', '你勾选并输入的值，引擎已按此采用（见「用户给定」列）', S.key), 4),
+        pad(kv('引擎推荐', nEng, '项', '引擎算出或择优得到的推荐值，如桨径、电机 KV、续航 —— 可直接采用', S.ok), 4),
         pad(kv('模板默认', nDft, '项', '沿用该机型模板基线，未参与计算', S.note), 4),
         [],
-        section('全部锚点一览（用户输入 + 引擎计算 + 模板默认）', 6),
-        header(['锚点', '数值', '单位', '来源', '维度', '说明'])
-      ].concat(avRows.length ? avRows : [pad([{ v: '（无锚点数据）', style: S.note }], 6)]).concat([
+        section('全部锚点一览：用户给定值 与 引擎推荐值 并列对照', 7),
+        header(['锚点', '用户给定', '推荐数值', '单位', '来源', '维度', '说明'])
+      ].concat(avRows.length ? avRows : [pad([{ v: '（无锚点数据）', style: S.note }], 7)]).concat([
         [],
-        section('识别到的维度', 6),
-        header(['维度', '说明', '', '', '', ''])
+        section('识别到的维度', 7),
+        header(['维度', '说明', '', '', '', '', ''])
       ]).concat(dims.length
-        ? dims.map(function (d) { return pad([{ v: d.name, style: S.value }, { v: '用户锚点覆盖该维度', style: S.note }], 6); })
-        : [pad([{ v: '（无）', style: S.note }], 6)]).concat([
+        ? dims.map(function (d) { return pad([{ v: d.name, style: S.value }, { v: '用户锚点覆盖该维度', style: S.note }], 7); })
+        : [pad([{ v: '（无）', style: S.note }], 7)]).concat([
         [],
-        section('内部参数补全来源（模板基线 + 规则库）', 6),
-        header(['内部参数', '最终取值', '单位', '来源', '', ''])
-      ]).concat(srcRows)
+        section('内部参数补全来源（模板基线 + 规则库）', 7),
+        header(['内部参数', '最终取值', '单位', '来源', '', '', ''])
+      ]).concat(srcRows.map(function (r) { return r.concat([null, null, null]).slice(0, 7); }))
     });
 
     /* ---------- 3 推荐方案 ---------- */
@@ -528,7 +534,7 @@
       rows: [
         pad([{ v: '三、总体参数', style: S.title }], 6),
         [],
-        header(['参数', '数值', '单位', '说明 / 公式', '', '']),
+        header(['参数', '推荐值', '单位', '说明 / 公式', '', '']),
         pad(kv('起飞重量', num(c.mass), 'kg', '用户锚点或由翼载反推'), 4),
         pad(kv('翼面积 S', num(c.area), 'm²', 'S = m·10 / wl[g/dm²]'), 4),
         pad(kv('翼展 b', num(c.span), 'm', 'b = √(AR·S)'), 4),
@@ -567,7 +573,7 @@
         pad([{ v: '四、NACA 翼型', style: S.title }], 6),
         [],
         section('选定翼型', 6),
-        header(['参数', '数值', '单位', '说明', '', '']),
+        header(['参数', '推荐值', '单位', '说明', '', '']),
         pad(kv('编号', af.designation || (isRotary ? NA : '—'), '', af.series || ''), 4),
         pad(kv('最大厚度', af.tc ? num(af.tc * 100) : '—', '% 弦长', 't/c'), 4),
         pad(kv('最大弯度', af.camber != null ? num(af.camber * 100) : '—', '% 弦长', 'm/c'), 4),
@@ -599,7 +605,7 @@
       rows: [
         pad([{ v: '五、机翼参数', style: S.title }], 6),
         [],
-        header(['参数', '数值', '单位', '说明', '', '']),
+        header(['参数', '推荐值', '单位', '说明', '', '']),
         pad(kv('翼型', af.designation || '—', '', ''), 4),
         pad(kv('机身长度', num(c.fuselageLength * 1000), 'mm', '用于绘制侧视图与布置设备'), 4),
         pad(kv('机身长度 / 翼展', num(c.fuselageRatio), '', '常规 0.55 ~ 0.85'), 4),
@@ -633,7 +639,7 @@
       rows: [
         pad([{ v: '六、尾翼参数', style: S.title }], 6),
         [],
-        header(['参数', '数值', '单位', '说明 / 公式', '', '']),
+        header(['参数', '推荐值', '单位', '说明 / 公式', '', '']),
         pad(kv('平尾面积 Sh', num(tailSh * 1e4), 'cm²', 'Vh = Sh·lh / (S·MAC)'), 4),
         pad(kv('平尾展长', num(Math.sqrt(Math.max(0, tailSh) * (c.ar * 0.55)) * 1000), 'mm',
           '按平尾展弦比约 ' + num(c.ar * 0.55) + ' 估算'), 4),
@@ -659,7 +665,7 @@
       rows: [
         pad([{ v: '七、重心与稳定性', style: S.title }], 6),
         [],
-        header(['参数', '数值', '单位', '说明', '', '']),
+        header(['参数', '推荐值', '单位', '说明', '', '']),
         pad(kv('平均气动弦 MAC', num(c.cg && c.cg.mac * 1000), 'mm', ''), 4),
         pad(kv('机翼焦点位置', cgOk ? num(c.cg.acPct * 100) : NA, cgOk ? '% MAC' : '',
           '机翼 + 平尾组合焦点（中性点）'), 4),
@@ -677,7 +683,7 @@
     });
 
     /* ---------- 9 动力系统 ---------- */
-    const powerRows = [header(['参数', '数值', '单位', '说明', '', ''])];
+    const powerRows = [header(['参数', '推荐值', '单位', '说明', '', ''])];
     if (pw) {
       powerRows.push(pad(kv('动力形式', '电动 + 定距螺旋桨', '', '直驱'), 4));
       powerRows.push(pad(kv('电机规格', (pw.motor || '—') + ' / ' + pw.kv + ' KV', '',
@@ -734,7 +740,7 @@
       rows: [
         pad([{ v: '九、结构与材料', style: S.title }], 6),
         [],
-        header(['项目', '取值 / 建议', '单位', '说明', '', '']),
+        header(['项目', '推荐值 / 建议', '单位', '说明', '', '']),
         pad(kv('主体材料', stc.materials || '—', '', '按机型与用途推荐'), 4),
         pad(kv('设计过载', num(stc.nLimit), 'G', '机动载荷系数'), 4),
         pad(kv('安全系数', num(stc.safetyFactor), '', '极限载荷 = 限制载荷 × 安全系数'), 4),
