@@ -145,13 +145,17 @@
    * 3. NACA 编号解析
    * ===================================================================== */
   function clean(s) {
-    return String(s == null ? '' : s).toUpperCase().replace(/\s+/g, '').replace(/^NACA/, '');
+    // 去掉全部前缀 NACA（含重复出现的情况，如 "NACA NACA 2412"）与所有空白
+    return String(s == null ? '' : s).toUpperCase().replace(/\s+/g, '').replace(/^(NACA)+/, '');
   }
 
   function fromRow(row) {
     return {
       valid: true, gen: row.gen, tc: row.tc, camber: row.camber, pos: row.pos,
-      cl: row.dc, dc: row.dc, code: row.d, series: 'NACA ' + row.gen + ' 位翼型',
+      cl: row.dc, dc: row.dc,
+      code: String(row.d).replace(/^NACA\s*/i, ''),   // 裸编号，如 "2412"
+      full: row.d,                                    // 完整写法，如 "NACA 2412"
+      series: 'NACA ' + row.gen + ' 位翼型',
       clmax: row.clmax, cd0: row.cd0, aStall: row.aStall, cm0: row.cm0, a0: row.a0,
       notes: row.notes, tags: row.tags.slice(), tabulated: true, reason: ''
     };
@@ -221,7 +225,17 @@
 
   function estimate(designation, Re) {
     const p = parse(designation);
-    if (!p.valid) return Object.assign({}, p, { designation: String(designation) });
+    // 编号无法识别时，绝不能返回缺少气动数据的空壳（否则下游全是 NaN）。
+    // 这里退回 NACA 2412 的完整数据，并留下 substituted / reason 供上层提示。
+    if (!p.valid) {
+      const fb = BY_NAME.get('2412');
+      const base = fromRow(fb);
+      return applyReynolds(Object.assign(base, {
+        designation: String(designation),
+        estimate: true, substituted: true, reason: p.reason,
+        notes: '编号「' + designation + '」无法识别（' + p.reason + '），已临时按 NACA 2412 计算。'
+      }), Re);
+    }
 
     const key = clean(designation);
     const row = BY_NAME.get(key) || BY_NAME.get(key.replace(/^6-/, '6')) || BY_NAME.get(key.replace(/^6/, '6-'));
