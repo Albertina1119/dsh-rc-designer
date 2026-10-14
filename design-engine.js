@@ -1373,11 +1373,17 @@
       if (!isUser && isNum(v) && ['prop', 'kv', 'chord', 'vstall', 'endurance', 'disk', 'nrotor'].indexOf(a.id) >= 0) {
         source = 'engine';
       }
+      // 原数值：用户给了就是用户值，否则取机型模板基线（模板没有则取锚点默认值）
+      let base = isUser ? vals[a.id] : (tpl[a.id] !== undefined ? tpl[a.id] : a.def);
+      if (!isNum(base)) base = null;
+      const changed = isNum(v) && isNum(base) && Math.abs(v - base) > 1e-9;
       return {
         id: a.id, label: a.label, unit: a.unit, dim: a.dim,
         dimName: (DIMENSIONS[a.dim] || {}).name || a.dim,
         kind: a.kind || 'num',
         value: isNum(v) ? v : null,
+        base: base,                       // 原数值（用户输入 或 机型模板默认）
+        changed: changed,                 // 推荐值是否与原数值不同
         source: source,
         note: extra[a.id] || '',
         userAnchor: isUser,
