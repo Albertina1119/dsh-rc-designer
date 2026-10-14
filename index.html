@@ -439,7 +439,7 @@ table.cmp td.best{color:var(--ok);font-weight:700}
           <button class="btn ok" id="btnFreeze" style="flex:1">确定方案 · 生成只读快照</button>
         </div>
         <div class="btnrow" style="margin-top:8px">
-          <button class="btn pri" id="btnXlsx" style="flex:1" disabled>⤓ 导出 Excel（17 个工作表）</button>
+          <button class="btn pri" id="btnXlsx" style="flex:1" disabled>⤓ 导出 Excel（18 个工作表）</button>
         </div>
         <div class="hint" id="exportMsg" style="margin-top:9px"></div>
       </div>
@@ -841,7 +841,7 @@ function selectPlan(i) {
 const PARAM_TABS = [
   { k:'overview', n:'总体' }, { k:'geom', n:'机翼' }, { k:'airfoil', n:'翼型' },
   { k:'tail', n:'尾翼' }, { k:'cg', n:'重心' }, { k:'power', n:'动力' },
-  { k:'perf', n:'性能' }, { k:'struct', n:'结构' }
+  { k:'perf', n:'性能' }, { k:'struct', n:'结构' }, { k:'model', n:'建模 ⬅Inventor' }
 ];
 
 const LOCKABLE = ['mass','area','span','ar','taper','twr','kv','prop','voltage','capa','payload'];
@@ -1084,6 +1084,37 @@ function renderParams() {
     R('方向舵舵机', null, st.servoRudder, 'kg·cm', '', 1);
   }
 
+  /* ---- Inventor 建模设计参数 ---- */
+  if (S.paramTab === 'model') {
+    const mp = S.result.modelingParams
+      || (DesignEngine.modelingParams ? DesignEngine.modelingParams(p) : []) || [];
+    if (!mp.length) {
+      rows.push('<tr><td colspan="4" class="empty">暂无建模参数</td></tr>');
+    } else {
+      rows.push('<tr><td colspan="4" style="padding:8px 10px;font-size:11px;color:var(--tx3);' +
+        'background:rgba(121,166,255,.07);border-radius:6px">' +
+        '把下面尺寸直接输入 <b style="color:var(--acc)">Autodesk Inventor</b>（或 SolidWorks / Fusion 360）建模。' +
+        '长度统一 <b>mm</b>，角度为 <b>°</b>；坐标原点建议取「机翼根弦前缘」，机身对称面为 XZ 平面。' +
+        '标 <b style="color:var(--warn)">★</b> 的条目最容易漏，但会直接影响装配。</td></tr>');
+      let cur = null;
+      mp.forEach(it => {
+        if (it.group !== cur) {
+          cur = it.group;
+          rows.push('<tr><td colspan="4" style="padding:9px 4px 3px;font-size:11px;font-weight:600;' +
+            'color:var(--acc);letter-spacing:.5px">● ' + it.group + '</td></tr>');
+        }
+        const marked = (it.note || '').indexOf('★') >= 0;
+        rows.push('<tr' + (marked ? ' class="lk"' : '') + '><td></td>' +
+          '<td class="pn">' + it.name + '</td>' +
+          '<td class="pv">' + (it.value === null ? '—' : it.value) +
+          (it.unit ? ' <span class="pu">' + it.unit + '</span>' : '') + '</td>' +
+          '<td class="pf">' + (it.note || '') + '</td></tr>');
+      });
+      rows.push('<tr><td colspan="4" style="padding:8px 4px;font-size:10.5px;color:var(--tx3)">' +
+        '共 ' + mp.length + ' 项建模参数　·　导出 Excel 时在「<b>Inventor 建模参数</b>」工作表可以拿到完整表格</td></tr>');
+    }
+  }
+
   body.innerHTML = rows.join('');
 
   body.querySelectorAll('[data-lock]').forEach(b => {
@@ -1296,6 +1327,7 @@ function exportXlsx() {
     top3: S.result.top3,
     anchors: S.anchors,
     anchorValues: S.result.anchorValues,
+    modelingParams: S.result.modelingParams,
     dimensionInfo: S.result.dimensionInfo,
     airfoilRecommendations: S.result.airfoilRecommendations,
     naming: S.naming,
@@ -1304,7 +1336,7 @@ function exportXlsx() {
   try {
     const size = XlsxExport.download(payload, (S.naming.name || '设计方案') + '.xlsx');
     $('exportMsg').innerHTML = '<span style="color:var(--ok)">已导出 ' + (size / 1024).toFixed(1) +
-      ' KB，共 17 个工作表：封面 / 输入锚点 / 推荐方案 / 总体参数 / 翼型参数 / 机翼参数 / 尾翼参数 / 重心与稳定 / 动力系统 / 结构材料 / 约束校验 / 评分明细 / 推荐理由 / 方案对比 / 飞机命名 / 公式依赖 / 版本历史。</span>';
+      ' KB，共 18 个工作表：封面 / 输入锚点 / 推荐方案 / 总体参数 / 翼型参数 / 机翼参数 / 尾翼参数 / 重心与稳定 / 动力系统 / 结构材料 / Inventor 建模参数 / 约束校验 / 评分明细 / 推荐理由 / 方案对比 / 飞机命名 / 公式依赖 / 版本历史。</span>';
     toast('Excel 已开始下载', 'ok');
   } catch (e) {
     console.error(e);
