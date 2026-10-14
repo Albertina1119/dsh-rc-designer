@@ -816,6 +816,44 @@
       ].concat(mpRows)
     });
 
+    /* ---------- 10c 翼型坐标点表 ---------- */
+    let afCoord = p.airfoilContour;
+    if (!afCoord && typeof AeroLib !== 'undefined' && AeroLib.contour && af.designation) {
+      afCoord = AeroLib.contour(af.designation, 80, isFinite(c.planform && c.planform.root) ? +(c.planform.root * 1000).toFixed(1) : 200);
+    }
+    const afRows = [header(['序号', 'X (mm)', 'Y (mm)', '部位', 'X/c', 'Y/c'])];
+    if (afCoord && afCoord.points) {
+      const ch = afCoord.chord || 1;
+      afCoord.points.forEach(function (pt, i) {
+        const xc = pt[0] / ch, yc = pt[1] / ch;
+        afRows.push(pad([
+          { v: i + 1, style: S.num },
+          { v: +pt[0].toFixed(3), style: S.num },
+          { v: +pt[1].toFixed(3), style: S.num },
+          { v: xc < 0.3 ? '前缘段' : (xc > 0.7 ? '后缘段' : '中段'), style: S.note },
+          { v: +xc.toFixed(4), style: S.num },
+          { v: +yc.toFixed(4), style: S.num }
+        ], 6));
+      });
+    }
+    defs.push({
+      name: '翼型坐标点表', freeze: 1,
+      cols: [{ w: 10 }, { w: 16 }, { w: 16 }, { w: 12 }, { w: 14 }, { w: 14 }],
+      rows: [
+        pad([{ v: '十一、翼型坐标点表（导入 CAD 生成翼型曲线）', style: S.title }], 6),
+        [],
+        pad(kv('翼型', af.designation || '—', '', af.series || ''), 4),
+        pad(kv('弦长', afCoord ? +(afCoord.chord).toFixed(1) : '—', 'mm', 'X / Y 坐标已按此弦长缩放'), 4),
+        pad(kv('点数', afCoord ? afCoord.N : 0, '点', '闭合轮廓，首尾不重复'), 4),
+        pad(kv('点顺序', '前缘 →（上表面）→ 后缘 →（下表面）→ 前缘', '', '按此顺序连成样条即为完整翼型轮廓'), 4),
+        [],
+        pad([{ v: '导入方法（Inventor）：草图 → 导入点 → 选择本表 X/Y 两列 → 用「样条曲线」依次连接 → 得到翼型轮廓。', style: S.note }], 6),
+        pad([{ v: '导入方法（XFLR5 / Profili）：把本表 X/Y 另存为 .dat（空格分隔），即可直接载入翼型。', style: S.note }], 6),
+        pad([{ v: '注意：本表坐标已按实际弦长缩放（单位 mm），不是归一化坐标；X/c、Y/c 两列是归一化值，可用于自行缩放。', style: S.note }], 6),
+        []
+      ].concat(afRows)
+    });
+
     /* ---------- 11 约束校验 ---------- */
     const consRows = [header(['级别', '类别', '检查项', '实测值', '经验区间', '结论'])];
     (best.constraints || []).forEach(function (it) {
