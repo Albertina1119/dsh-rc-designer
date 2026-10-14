@@ -1149,7 +1149,8 @@ function renderParams() {
         if (cc.N > show) prev += '…（其余 ' + (cc.N - show) + ' 点请下载或复制）';
         rows.push('<tr><td colspan="4"><div style="font-size:11px;color:var(--tx3);margin-bottom:4px">' +
           '闭合轮廓 ' + cc.N + ' 点，顺序：前缘 →（上表面）→ 后缘 →（下表面）→ 前缘；' +
-          '坐标已按弦长 ' + afChord + ' mm 缩放，可直接作为草图点导入。</div>' +
+          '坐标已按弦长 ' + afChord + ' mm 缩放，可直接作为草图点导入。<br>' +
+          '前缘附近 X 可能出现极小负值（约 -0.3% 弦长），这是弯度线在前缘有斜率的真实几何特征，属正常现象。</div>' +
           '<pre class="coordprev">' + prev + '</pre></td></tr>');
       }
 
