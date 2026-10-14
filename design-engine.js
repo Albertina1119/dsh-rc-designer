@@ -498,7 +498,7 @@
    *   几何组1：area = b² / AR
    *   几何组2：area = m[kg]·1000 / (wl[g/dm²]·100)
    */
-  function completeAnchors(anchors, type, anchorKeys) {
+  function completeAnchors(anchors, type, anchorKeys, raw) {
     const values = {}, src = {};
     const R = type.range;
     const num = function (v) { return isFinite(Number(v)) && v !== '' && v !== null && v !== undefined ? Number(v) : null; };
@@ -526,6 +526,40 @@
     const clampWl = function (v) { return clamp(v, R.wl[0], R.wl[1]); };
     const hasArea = function () { return src.area === 'anchor'; };
     const isAnchor = function (k) { return src[k] === 'anchor'; };
+
+    /* ---------------- 纯输入模式（raw）----------------
+     * 用户关掉「引擎推荐」时启用：只做「机型模板打底 + 用户锚点原样覆盖」，
+     * 不做任何联动推导（area⇄mass⇄wl、span⇄ar 等一概不互推）。
+     * 因此用户给的锚点若与机型模板的物理关系对不上，会如实暴露出来：
+     * 锚点一致性下降 → 总分按 (0.75 + 0.25×一致性) 折减，
+     * 同一套锚点在纯输入模式下的得分明显低于引擎补全模式。
+     * ⚠ 必须放在通用兜底之前，否则兜底会用「用户给的翼载」补面积，等于偷偷满足了锚点。
+     */
+    if (raw) {
+      const tplA = type.anchors || {};
+      if (!isFinite(values.area)) {
+        const wlRef = isFinite(tplA.wl) ? tplA.wl : 45;
+        const mRef = isFinite(tplA.mass) ? tplA.mass : values.mass;
+        values.area = (isFinite(mRef) && isFinite(wlRef) && wlRef > 0) ? (mRef * 10) / wlRef : 0.25;
+        src.area = 'baseline';
+      }
+      if (!isFinite(values.span)) {
+        const arRef = isFinite(tplA.ar) ? tplA.ar : 6;
+        values.span = Math.sqrt(Math.max(0.001, values.area) * arRef);
+        src.span = 'baseline';
+      }
+      if (!isFinite(values.taper)) { values.taper = 0.7; src.taper = 'baseline'; }
+      if (!isFinite(values.mass)) { values.mass = isFinite(tplA.mass) ? tplA.mass : 1.2; src.mass = 'baseline'; }
+      if (!isFinite(values.prop)) { values.prop = 10; src.prop = 'baseline'; }
+      if (!isFinite(values.kv)) { values.kv = 1000; src.kv = 'baseline'; }
+      if (!isFinite(values.voltage)) { values.voltage = 11.1; src.voltage = 'baseline'; }
+      if (!isFinite(values.capa)) { values.capa = 3000; src.capa = 'baseline'; }
+      if (!isFinite(values.payload)) { values.payload = 0; src.payload = 'baseline'; }
+      values.area = clamp(values.area, 0.01, 3.0);
+      values.span = clamp(values.span, 0.15, 6.0);
+      values.mass = clamp(values.mass, 0.03, 20);
+      return { values: values, source: src, raw: true };
+    }
 
     // 3) 模板可能未声明 area / taper，这里用规则补齐基线，避免后续出现 NaN
     if (!isFinite(values.area)) {
@@ -1070,7 +1104,7 @@
    * 9. 单方案构建（候选 → 完整方案对象）
    * ===================================================================== */
   function buildPlan(input, type, seedInfo) {
-    const completed = completeAnchors(input.anchors || {}, type, input.anchorKeys);
+    const completed = completeAnchors(input.anchors || {}, type, input.anchorKeys, input.raw);
     const values = completed.values;
     const src = completed.source;
     // 合并用户对派生参数的直接指定；翼型同时兼容 opts.airfoil 与 anchors.airfoil 两种传入方式
@@ -1630,6 +1664,52 @@
       return input.anchorKeys.indexOf(k) < 0;
     });
     input.freeKeys = freeKeys;
+
+    /* ---- 纯输入模式（noAuto）：不搜索、不择优、不联动推导 ---- */
+    if (opts.noAuto) {
+      const ak = input.anchorKeys;
+      // 三套变体只微调梢根比，保证 Top3 结构完整；不碰用户锚定的任何项
+      const variants = [
+        { tag: '严格按机型模板 + 你的输入' },
+        { tag: '梢根比取 0.60', taper: 0.60 },
+        { tag: '梢根比取 0.85', taper: 0.85 }
+      ];
+      const rawBuilt = variants.map(function (v) {
+        const a = Object.assign({}, input.anchors);
+        if (v.taper != null && a.taper === undefined) a.taper = v.taper;
+        const p = buildPlan(Object.assign({}, input, { anchors: a, anchorKeys: ak, raw: true }), type,
+          { confidence: 60, rawTag: v.tag });
+        p.rawTag = v.tag;
+        return p;
+      });
+      const rawOk = rawBuilt.filter(function (p) { return p.feasible; });
+      const rawCands = { all: rawBuilt, feasible: rawOk, best: rawOk[0] || rawBuilt[0] };
+      const rawTop3 = pickTop3(rawCands);
+      const rawBest = rawTop3[0].plan;
+      const rawAirfoilRec = Aero.recommendAirfoils({
+        style: type.style, Re: rawBest.core.reCruise || 2e5, needCl: rawBest.values.needCl,
+        wantLowTorque: type.id === 'glider' || type.id === 'endurance', forbidSymmetric: type.id !== '3d'
+      }, 3);
+      const rawPlans = rawTop3.map(function (t) {
+        return {
+          key: t.objective.key, label: t.objective.name, tag: t.plan.rawTag || t.objective.tag,
+          plan: t.plan,
+          reasons: explain(t.plan, type, inferred),
+          warnings: t.plan.warnings.map(function (w) { return w.name + '：' + w.msg; })
+        };
+      });
+      return {
+        ok: true, version: VERSION, typeId: type.id, typeName: type.name,
+        mode: 'raw', modeName: '纯输入模式（未使用引擎推荐）',
+        inferred: inferred,
+        candidatesEvaluated: rawBuilt.length, feasibleCount: rawOk.length,
+        top3: rawPlans, best: rawBest, airfoilRecommendations: rawAirfoilRec,
+        anchorValues: anchorValues(rawBest),
+        modelingParams: modelingParams(rawBest),
+        dimensionInfo: (inferred ? inferred.dims : []).map(function (d) { return DIMENSIONS[d]; })
+      };
+    }
+
     const cands = generateCandidates(input, type, freeKeys);
 
     if (!cands.feasible.length && cands.all.length === 0) {
@@ -1663,6 +1743,7 @@
 
     return {
       ok: true, version: VERSION, typeId: type.id, typeName: type.name,
+      mode: 'auto', modeName: '引擎补全并择优',
       inferred: inferred, candidatesEvaluated: cands.all.length, feasibleCount: cands.feasible.length,
       top3: plans, best: plans[0].plan, airfoilRecommendations: airfoilRec,
       // 全锚点取值汇总（含引擎计算出的其余锚点，如桨径 / 电机 KV / 续航等）
