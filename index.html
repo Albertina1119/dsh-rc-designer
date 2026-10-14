@@ -117,6 +117,39 @@ input:disabled{opacity:.4;cursor:not-allowed}
 .autoitem b{color:var(--tx3);font-weight:400}
 .autoitem.more{color:var(--tx3)}
 
+/* ---------- 警告弹窗 ---------- */
+.overlay{position:fixed;inset:0;background:rgba(6,9,16,.72);backdrop-filter:blur(3px);
+  display:none;align-items:center;justify-content:center;z-index:200;padding:20px}
+.overlay.on{display:flex}
+.modalcard{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:22px 24px;max-width:560px;width:100%;box-shadow:0 24px 70px rgba(0,0,0,.6);
+  animation:pop .16s ease-out}
+@keyframes pop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+.modalcard h3{margin:0 0 12px;font-size:15px;color:var(--tx);display:flex;align-items:center;gap:8px}
+.modalcard h3::before{content:'';width:4px;height:15px;border-radius:2px;background:var(--warn)}
+.modalbody{font-size:12.5px;color:var(--tx2);line-height:1.75}
+.modalbody ul{margin:9px 0 0;padding-left:20px}
+.modalbody li{margin:3px 0}
+.modalbody b{color:var(--tx)}
+.modalbody .em{color:var(--warn);font-weight:600}
+.modalacts{display:flex;gap:9px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+
+/* ---------- 锚点页：推荐值开关与对比表 ---------- */
+.recswitch{display:flex;align-items:center;gap:7px;padding:7px 10px;margin:9px 0 0;
+  background:rgba(121,166,255,.07);border:1px solid var(--line);border-radius:8px;
+  font-size:11.5px;color:var(--tx2);cursor:pointer;user-select:none}
+.recswitch input{cursor:pointer}
+.recswitch b{color:var(--tx)}
+.cmpbox{margin-top:10px;border:1px solid rgba(248,150,30,.3);border-radius:9px;
+  background:rgba(248,150,30,.06);padding:10px 11px}
+.cmphead{font-size:11px;font-weight:600;color:var(--warn);margin-bottom:7px;letter-spacing:.3px}
+.cmptbl{width:100%;border-collapse:collapse;font-size:10.5px}
+.cmptbl th{text-align:left;color:var(--tx3);font-weight:400;padding:2px 5px;border-bottom:1px solid var(--line)}
+.cmptbl td{padding:3px 5px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--tx2)}
+.cmptbl td.n{text-align:right;font-variant-numeric:tabular-nums}
+.cmptbl td.diff{color:var(--ok);font-weight:600}
+.cmptbl tr.same td{opacity:.62}
+
 /* ---------- 建模页：翼型坐标预览 ---------- */
 .coordprev{margin:0;padding:9px 11px;max-height:200px;overflow:auto;background:rgba(0,0,0,.28);
   border:1px solid var(--line);border-radius:7px;font-family:ui-monospace,Consolas,monospace;
@@ -319,7 +352,7 @@ table.cmp td.best{color:var(--ok);font-weight:700}
     </div>
 
     <div class="card">
-      <h2><span class="n">2</span>数值锚点<span class="r" id="anchorCount">0 / 2~4</span></h2>
+      <h2><span class="n">2</span>数值锚点<span class="r" id="anchorCount">0 / 最少 2 个</span></h2>
       <div class="body">
         <div class="src-tabs" id="dimTabs"></div>
         <div style="max-height:330px;overflow:auto">
@@ -329,7 +362,12 @@ table.cmp td.best{color:var(--ok);font-weight:700}
           </table>
         </div>
         <div class="hint" id="anchorHint" style="margin-top:9px"></div>
+        <label class="recswitch" id="recSwitchWrap">
+          <input type="checkbox" id="recSwitch" checked>
+          <span>显示引擎<b>推荐值</b>　<span style="color:var(--tx3)">关闭后改为「原数值 vs 推荐数值」对比表</span></span>
+        </label>
         <div class="autobox" id="anchorAuto" style="display:none"></div>
+        <div class="cmpbox" id="anchorCmp" style="display:none"></div>
         <div class="btnrow" style="margin-top:11px">
           <button class="btn pri" id="btnPlan" style="flex:1">生成推荐方案 →</button>
         </div>
@@ -366,7 +404,7 @@ table.cmp td.best{color:var(--ok);font-weight:700}
     <div class="card">
       <h2><span class="n">5</span>Top3 推荐方案<span class="r" id="planType"></span></h2>
       <div class="body" id="planList">
-        <div class="empty">在左侧勾选 2~4 个数值锚点（覆盖至少 2 个维度），<br>点击「生成推荐方案」开始。</div>
+        <div class="empty">在左侧勾选 <b>至少 2 个</b>数值锚点（覆盖至少 2 个维度），<br>点击「生成推荐方案」开始。锚点数量不设上限。</div>
       </div>
     </div>
 
@@ -457,6 +495,15 @@ table.cmp td.best{color:var(--ok);font-weight:700}
 
 <div class="toast" id="toast"></div>
 
+<!-- ============ 警告弹窗 ============ -->
+<div class="overlay" id="modal">
+  <div class="modalcard">
+    <h3 id="modalTitle">提示</h3>
+    <div class="modalbody" id="modalBody"></div>
+    <div class="modalacts" id="modalActs"></div>
+  </div>
+</div>
+
 <script src="airfoil-lib.js"></script>
 <script src="design-engine.js"></script>
 <script src="xlsx-export.js"></script>
@@ -479,7 +526,8 @@ const S = {
   frozen: false,
   afN: 80,                    // 建模页：翼型坐标点数（单面）
   afChord: null,              // 建模页：坐标缩放弦长 mm（null = 用根弦）
-  afCSV: false                // 建模页：复制坐标时用逗号分隔
+  afCSV: false,               // 建模页：复制坐标时用逗号分隔
+  showRec: true               // 锚点表是否直接显示引擎推荐值（关闭后改为对比表）
 };
 
 const DIMCOLOR = { geometry:'#4cc9f0', weight:'#f9c74f', power:'#f8961e', performance:'#90be6d', style:'#c77dff' };
@@ -494,6 +542,29 @@ function toast(msg, kind) {
   clearTimeout(toast._t);
   toast._t = setTimeout(() => { t.className = 'toast'; }, 2400);
 }
+
+/* =====================================================================
+ * 警告弹窗（模态）
+ * =================================================================== */
+function showModal(opt) {
+  const ov = $('modal');
+  const o = opt || {};
+  $('modalTitle').textContent = o.title || '提示';
+  $('modalBody').innerHTML = o.body || '';
+  const acts = $('modalActs');
+  while (acts.firstChild) acts.removeChild(acts.firstChild);
+  (o.actions || [{ label: '知道了', kind: 'pri' }]).forEach(a => {
+    const b = document.createElement('button');
+    b.className = 'btn ' + (a.kind === 'pri' ? 'pri' : (a.kind === 'ghost' ? 'ghost' : ''));
+    b.textContent = a.label;
+    b.onclick = () => { closeModal(); if (a.onClick) a.onClick(); };
+    acts.appendChild(b);
+  });
+  ov.className = 'overlay on';
+  const first = acts.querySelector('button');
+  if (first) first.focus();
+}
+function closeModal() { $('modal').className = 'overlay'; }
 
 /* =====================================================================
  * 左栏：机型
@@ -525,16 +596,50 @@ function computedAnchor(id) {
   return null;
 }
 
-/** 锚点表下方的「引擎自动补全」汇总 */
+/** 锚点表下方的「引擎自动补全」汇总 / 「原数值 vs 推荐数值」对比 */
 function renderAnchorAuto() {
   const box = $('anchorAuto');
+  const cmp = $('anchorCmp');
   if (!box) return;
   if (!S.result || !S.result.anchorValues) {
     box.style.display = 'none';
+    if (cmp) cmp.style.display = 'none';
     return;
   }
-  const auto = S.result.anchorValues.filter(r => r.source === 'engine' && r.value !== null);
-  const dft = S.result.anchorValues.filter(r => r.source === 'baseline' && r.value !== null);
+  const all = S.result.anchorValues;
+  const auto = all.filter(r => r.source === 'engine' && r.value !== null);
+  const dft = all.filter(r => r.source === 'baseline' && r.value !== null);
+
+  // ---- 推荐值显示开关（关闭时只显示对比表）----
+  if (!S.showRec) {
+    box.style.display = 'none';
+    if (cmp) {
+      const rows = all.map(r => {
+        const base = r.base === null ? '—' : fmtCmp(r.base, r);
+        const rec = r.value === null ? '—' : fmtCmp(r.value, r);
+        return '<tr class="' + (r.changed ? '' : 'same') + '">' +
+          '<td>' + r.label + '</td>' +
+          '<td class="n">' + base + '</td>' +
+          '<td class="n ' + (r.changed ? 'diff' : '') + '">' + rec + (r.changed ? ' ▲' : '') + '</td>' +
+          '<td>' + (r.unit || '') + '</td>' +
+          '<td style="color:var(--tx3)">' + (r.userAnchor ? '你的输入' : (r.changed ? '引擎已调整' : '与模板一致')) + '</td>' +
+          '</tr>';
+      }).join('');
+      const nChg = all.filter(r => r.changed).length;
+      cmp.style.display = '';
+      cmp.innerHTML =
+        '<div class="cmphead">原数值 与 推荐数值 对比（' + nChg + ' 项被引擎调整）</div>' +
+        '<table class="cmptbl"><thead><tr><th>锚点</th><th style="text-align:right">原数值</th>' +
+        '<th style="text-align:right">推荐数值</th><th>单位</th><th>说明</th></tr></thead>' +
+        '<tbody>' + rows + '</tbody></table>' +
+        '<div class="hint" style="margin-top:7px">「原数值」= 你勾选时输入的值；未勾选的取<b>机型模板默认值</b>。' +
+        '带 <span style="color:var(--ok)">▲</span> 的行表示引擎做了调整。' +
+        '勾选上方开关可把推荐值直接显示回锚点表。</div>';
+    }
+    return;
+  }
+
+  if (cmp) cmp.style.display = 'none';
   if (!auto.length) { box.style.display = 'none'; return; }
   // 优先展示对设计最有影响的几项
   const priority = ['prop', 'kv', 'area', 'mass', 'ar', 'chord', 'twr', 'vmax', 'vstall', 'endurance', 'voltage', 'capa'];
@@ -554,6 +659,16 @@ function renderAnchorAuto() {
     '<div class="autolist">' + pick.map(r => '<span class="autoitem">' + fmt1(r) + '</span>').join('') +
     (auto.length > pick.length ? '<span class="autoitem more">…共 ' + auto.length + ' 项</span>' : '') + '</div>' +
     '<div class="hint" style="margin-top:6px">这些值由引擎计算或择优得出，可直接采用；若想改为自己指定，勾选左侧方框即可。</div>';
+}
+
+/** 对比表里的数值格式化（枚举锚点显示选项文字） */
+function fmtCmp(v, r) {
+  if (r && r.kind === 'enum' && r.options) {
+    const o = r.options.filter(x => x.v === v)[0];
+    if (o) return o.t;
+  }
+  if (typeof v !== 'number') return String(v);
+  return Math.abs(v) >= 100 ? v.toFixed(0) : (Math.abs(v) >= 1 ? v.toFixed(2) : v.toFixed(3));
 }
 
 function applicableAnchors() {
@@ -601,8 +716,8 @@ function renderAnchors() {
     const picked = S.anchors[a.id] !== undefined;
     const tr = document.createElement('tr');
     const eff = S.anchors[a.id] !== undefined ? S.anchors[a.id] : a.def;
-    // 未勾选的锚点：显示引擎算出来的值（文档要求「添加其余计算出的未知锚点」）
-    const comp = picked ? null : computedAnchor(a.id);
+    // 未勾选的锚点：仅在「显示推荐值」开启时显示引擎算出的值（可用开关随时关闭）
+    const comp = (picked || !S.showRec) ? null : computedAnchor(a.id);
     let valueCell;
     if (picked) {
       valueCell = a.kind === 'enum'
@@ -614,11 +729,7 @@ function renderAnchors() {
       const srcTag = comp.source === 'engine'
         ? '<span class="autotag cal">引擎计算</span>'
         : '<span class="autotag dft">模板默认</span>';
-      const shown = comp.kind === 'enum' && comp.options
-        ? (comp.options.filter(o => o.v === comp.value)[0] || {}).t || comp.value
-        : (Math.abs(comp.value) >= 100 ? comp.value.toFixed(0)
-          : comp.value.toFixed(comp.value < 1 ? 3 : 2).replace(/\.?0+$/, ''));
-      valueCell = '<span class="autoval" title="' + (comp.note || '由引擎计算得出') + '">' + shown + '</span>' + srcTag;
+      valueCell = '<span class="autoval" title="' + (comp.note || '由引擎计算得出') + '">' + fmtCmp(comp.value, comp) + '</span>' + srcTag;
     } else {
       valueCell = '<span class="autoval dim">—</span>';
     }
@@ -660,6 +771,15 @@ function renderAnchors() {
       updateAnchorHint();
     };
   });
+  // 推荐值显示开关
+  if ($('recSwitch')) {
+    $('recSwitch').checked = S.showRec !== false;
+    $('recSwitch').onchange = (e) => {
+      S.showRec = e.target.checked;
+      renderAnchors();
+      toast(S.showRec ? '已显示引擎推荐值' : '已关闭推荐值，下方改为对比表', 'ok');
+    };
+  }
   updateAnchorHint();
 }
 
@@ -671,6 +791,7 @@ function updateAnchorHint() {
   const okN = n >= 2;
   const okD = dims.size >= 2;
   $('btnPlan').disabled = !(okN && okD);
+  $('btnPlan').title = (okN && okD) ? '' : '至少需要 2 个锚点并覆盖 2 个维度';
   let msg;
   if (n === 0) msg = '请勾选锚点（至少 2 个，数量不设上限）。锚点越贴近性能指标（翼载 / 推重比 / 速度 / 展弦比），推荐越准。';
   else if (!okN) msg = '还需再选 ' + (2 - n) + ' 个锚点（至少 2 个）。';
@@ -680,6 +801,60 @@ function updateAnchorHint() {
     [...dims].map(d => DesignEngine.DIMENSIONS[d].name).join('、') + '）。可以生成方案。';
   $('anchorHint').innerHTML = msg;
   $('anchorHint').style.color = (okN && okD) ? 'var(--ok)' : 'var(--tx3)';
+
+  /* 锚点不足 2 个 / 维度不足 2 个时，弹出警告弹窗（在用户点击生成时触发，见 checkAnchorsOrWarn） */
+}
+
+/** 生成方案前的校验：不满足条件则弹窗警告并返回 false */
+function checkAnchorsOrWarn() {
+  const keys = Object.keys(S.anchors);
+  const n = keys.length;
+  const dims = new Set(keys.map(k => DesignEngine.ANCHOR_BY_ID[k].dim));
+  if (n >= 2 && dims.size >= 2) return true;
+
+  const MIN = 2;
+  const need = Math.max(0, MIN - n);
+  const names = keys.map(k => DesignEngine.ANCHOR_BY_ID[k].label);
+  const dimNames = [...dims].map(d => DesignEngine.DIMENSIONS[d].name);
+  // 推荐几个"最值得先定"的锚点
+  const suggest = ['wl', 'twr', 'vmax', 'mass', 'span', 'ar', 'prop', 'voltage']
+    .filter(k => S.anchors[k] === undefined)
+    .slice(0, 4)
+    .map(k => DesignEngine.ANCHOR_BY_ID[k].label + '（' + (DesignEngine.ANCHOR_BY_ID[k].unit || '—') + '）');
+
+  let body = '';
+  if (n < MIN) {
+    body =
+      '<p>当前只勾选了 <b class="em">' + n + '</b> 个锚点，<b>至少需要 ' + MIN + ' 个</b>才能生成方案。' +
+      '<b class="em">还差 ' + need + ' 个</b>。</p>' +
+      (n ? '<p style="margin-top:8px">已选：' + names.join('、') + '</p>' : '') +
+      '<p style="margin-top:8px">建议至少覆盖以下两个方面：</p><ul>' +
+      '<li><b>重量 / 几何</b>（翼载、翼面积、翼展、起飞重量）—— 决定翼载与失速速度</li>' +
+      '<li><b>动力 / 性能</b>（推重比、桨径、KV、最大速度、续航）—— 决定速度与爬升</li>' +
+      '</ul>' +
+      (suggest.length ? '<p style="margin-top:8px">可以从这些开始：<b>' + suggest.join('、') + '</b></p>' : '');
+  } else {
+    body =
+      '<p>已勾选 <b>' + n + '</b> 个锚点，但它们都落在同一个维度「<b class="em">' +
+      (dimNames[0] || '—') + '</b>」内。</p>' +
+      '<p style="margin-top:8px">请再覆盖至少 <b class="em">1 个其他维度</b>，否则引擎无法交叉推理。' +
+      '当前候选：' + suggest.join('、') + '</p>';
+  }
+
+  showModal({
+    title: n < MIN ? '锚点数量不足' : '维度覆盖不足',
+    body: body,
+    actions: [
+      { label: '去勾选锚点', kind: 'pri' },
+      { label: '用示例锚点生成', kind: 'ghost', onClick: () => {
+        // 一键补一组合理的锚点（练习机默认），让用户立刻看到效果
+        S.anchors = { wl: 45, twr: 0.65, vmax: 22, span: 1.2 };
+        renderAnchors();
+        doPlan();
+      } }
+    ]
+  });
+  return false;
 }
 
 /* =====================================================================
@@ -1505,7 +1680,7 @@ function exportXlsx() {
 /* =====================================================================
  * 事件绑定
  * =================================================================== */
-$('btnPlan').onclick = doPlan;
+$('btnPlan').onclick = () => { if (!checkAnchorsOrWarn()) return; doPlan(); };
 $('btnAuto').onclick = () => { S.typeId = null; renderTypes(); renderAnchors(); doPlan(); toast('已切换为自动识别机型', 'ok'); };
 $('btnApply').onclick = () => {
   const opts = {};
