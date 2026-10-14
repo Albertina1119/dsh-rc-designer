@@ -135,6 +135,13 @@ input:disabled{opacity:.4;cursor:not-allowed}
 .modalacts{display:flex;gap:9px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
 
 /* ---------- 锚点页：推荐值开关与对比表 ---------- */
+.modebanner{margin-bottom:11px;padding:10px 12px;border-radius:9px;font-size:11.5px;line-height:1.7}
+.modebanner.auto{background:rgba(57,217,138,.09);border:1px solid rgba(57,217,138,.32);color:var(--tx2)}
+.modebanner.raw{background:rgba(248,150,30,.1);border:1px solid rgba(248,150,30,.38);color:var(--tx2)}
+.modebanner b{color:var(--tx)}
+.modebanner .sc{font-weight:700;font-size:14px;color:var(--ok)}
+.modebanner.raw .sc{color:var(--warn)}
+.modebanner button{margin-top:7px}
 .recswitch{display:flex;align-items:center;gap:7px;padding:7px 10px;margin:9px 0 0;
   background:rgba(121,166,255,.07);border:1px solid var(--line);border-radius:8px;
   font-size:11.5px;color:var(--tx2);cursor:pointer;user-select:none}
@@ -364,7 +371,7 @@ table.cmp td.best{color:var(--ok);font-weight:700}
         <div class="hint" id="anchorHint" style="margin-top:9px"></div>
         <label class="recswitch" id="recSwitchWrap">
           <input type="checkbox" id="recSwitch" checked>
-          <span>显示引擎<b>推荐值</b>　<span style="color:var(--tx3)">关闭后改为「原数值 vs 推荐数值」对比表</span></span>
+          <span><b>引擎推荐值</b>　<span style="color:var(--tx3)">开启 = 引擎补全并择优；关闭 = 纯输入（只用你给的锚点 + 模板默认值），下方给出原数值对比</span></span>
         </label>
         <div class="autobox" id="anchorAuto" style="display:none"></div>
         <div class="cmpbox" id="anchorCmp" style="display:none"></div>
@@ -403,8 +410,11 @@ table.cmp td.best{color:var(--ok);font-weight:700}
 
     <div class="card">
       <h2><span class="n">5</span>Top3 推荐方案<span class="r" id="planType"></span></h2>
-      <div class="body" id="planList">
-        <div class="empty">在左侧勾选 <b>至少 2 个</b>数值锚点（覆盖至少 2 个维度），<br>点击「生成推荐方案」开始。锚点数量不设上限。</div>
+      <div class="body">
+        <div class="modebanner" id="modeBanner" style="display:none"></div>
+        <div id="planList">
+          <div class="empty">在左侧勾选 <b>至少 2 个</b>数值锚点（覆盖至少 2 个维度），<br>点击「生成推荐方案」开始。锚点数量不设上限。</div>
+        </div>
       </div>
     </div>
 
@@ -777,7 +787,13 @@ function renderAnchors() {
     $('recSwitch').onchange = (e) => {
       S.showRec = e.target.checked;
       renderAnchors();
-      toast(S.showRec ? '已显示引擎推荐值' : '已关闭推荐值，下方改为对比表', 'ok');
+      // 切换的是「设计模式」，所以需要重算（引擎补全并择优 ↔ 纯输入）
+      if (S.anchorsConfirmed || S.result) {
+        doPlan();
+        toast(S.showRec ? '已切换：引擎补全并择优' : '已切换：纯输入模式（不使用引擎推荐）', 'ok');
+      } else {
+        toast(S.showRec ? '已开启引擎推荐值' : '已关闭推荐值：只按你的输入计算', 'ok');
+      }
     };
   }
   updateAnchorHint();
@@ -865,6 +881,41 @@ function autoPlan() {
   else if (S.result) doPlan();
 }
 
+/** 中栏顶部的「设计模式」横幅：展示当前模式 + 两种模式的得分对比 */
+function renderModeBanner() {
+  const el = $('modeBanner');
+  if (!el) return;
+  if (!S.result) { el.style.display = 'none'; return; }
+  const isRaw = S.result.mode === 'raw';
+  const a = S.scoreAuto, r = S.scoreRaw;
+  const hasBoth = a != null && r != null;
+  const gain = hasBoth ? (a - r) : 0;
+  let txt;
+  if (isRaw) {
+    txt = '<b>当前模式：纯输入</b>（未使用引擎推荐）—— 只用你给的锚点 + 机型模板默认值，' +
+      '<b>不做联动推导、不择优</b>。<br>' +
+      '综合得分 <span class="sc">' + S.result.best.score.total + '</span> 分' +
+      (S.consRaw != null ? '（锚点一致性 ' + S.consRaw + '%）' : '') +
+      (hasBoth && gain > 0
+        ? '<br>开启「引擎推荐」后可提升到 <b style="color:var(--ok)">' + a + ' 分</b>（+ ' + gain + '）' +
+          '　<button class="btn sm pri" id="btnToAuto">改用引擎推荐</button>'
+        : '');
+  } else {
+    txt = '<b>当前模式：引擎补全并择优</b> —— 引擎补齐未指定的锚点并搜索最优组合。<br>' +
+      '综合得分 <span class="sc">' + S.result.best.score.total + '</span> 分' +
+      (S.consAuto != null ? '（锚点一致性 ' + S.consAuto + '%）' : '') +
+      (hasBoth && gain > 0
+        ? '<br>关闭「引擎推荐」改为纯输入后为 <b style="color:var(--warn)">' + r + ' 分</b>（- ' + gain + '）' +
+          '　<button class="btn sm" id="btnToRaw">改看纯输入模式</button>'
+        : '');
+  }
+  el.className = 'modebanner ' + (isRaw ? 'raw' : 'auto');
+  el.style.display = '';
+  el.innerHTML = txt;
+  if ($('btnToAuto')) $('btnToAuto').onclick = () => { S.showRec = true; renderAnchors(); doPlan(); };
+  if ($('btnToRaw')) $('btnToRaw').onclick = () => { S.showRec = false; renderAnchors(); doPlan(); };
+}
+
 function doPlan() {
   const opts = {};
   if (S.typeId) opts.typeId = S.typeId;
@@ -877,15 +928,29 @@ function doPlan() {
     });
   }
   opts.seed = 20240715;
-  let res;
+  // 两种「设计模式」各算一遍：
+  //   auto = 引擎补全并择优（推荐值开启）
+  //   raw  = 纯输入：只用你给的锚点 + 机型模板默认值，不做联动推导与择优
+  // 两个得分都留着，方便在横幅里对比。
+  let resAuto = null, resRaw = null;
   try {
-    res = DesignEngine.plan(S.anchors, opts);
-  } catch (e) {
-    toast('计算失败：' + e.message, 'err');
-    console.error(e);
+    resAuto = DesignEngine.plan(S.anchors, Object.assign({}, opts));
+  } catch (e) { console.error('auto 模式计算失败', e); }
+  try {
+    resRaw = DesignEngine.plan(S.anchors, Object.assign({}, opts, { noAuto: true }));
+  } catch (e) { console.error('raw 模式计算失败', e); }
+
+  const useRaw = S.showRec === false;
+  const res = useRaw ? (resRaw && resRaw.ok ? resRaw : resAuto) : (resAuto && resAuto.ok ? resAuto : resRaw);
+  if (!res || !res.ok) {
+    const msg = (resAuto && resAuto.error) || (resRaw && resRaw.error) || '生成失败';
+    toast(msg, 'err');
     return;
   }
-  if (!res.ok) { toast(res.error || '生成失败', 'err'); return; }
+  S.scoreAuto = (resAuto && resAuto.ok) ? resAuto.best.score.total : null;
+  S.scoreRaw = (resRaw && resRaw.ok) ? resRaw.best.score.total : null;
+  S.consAuto = (resAuto && resAuto.ok) ? resAuto.best.score.consistency : null;
+  S.consRaw = (resRaw && resRaw.ok) ? resRaw.best.score.consistency : null;
 
   S.result = res;
   S.selected = 0;
@@ -893,6 +958,7 @@ function doPlan() {
   S.snapshot = null;
   S.anchorsConfirmed = true;
 
+  renderModeBanner();
   renderDims(res);
   renderAirfoil(res);
   renderPlans(res);
