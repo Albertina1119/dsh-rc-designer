@@ -779,6 +779,43 @@
       ]
     });
 
+    /* ---------- 10b Inventor 建模设计参数 ---------- */
+    let mp = p.modelingParams;
+    if (!mp && typeof DesignEngine !== 'undefined' && DesignEngine.modelingParams && best.core) {
+      mp = DesignEngine.modelingParams(best);
+    }
+    mp = mp || [];
+    const mpGroups = [];
+    mp.forEach(function (it) { if (mpGroups.indexOf(it.group) < 0) mpGroups.push(it.group); });
+    const mpRows = [header(['类别', '参数', '数值', '单位', '说明 / 建模提示'])];
+    mpGroups.forEach(function (g) {
+      mpRows.push(pad([{ v: g, style: S.key }, { v: '', style: S.note }, { v: '', style: S.note },
+        { v: '', style: S.note }, { v: '', style: S.note }], 5));
+      mp.filter(function (x) { return x.group === g; }).forEach(function (it) {
+        mpRows.push(pad([
+          { v: '', style: S.note },
+          { v: it.name, style: S.label },
+          { v: it.value === null ? '—' : it.value, style: S.num },
+          { v: it.unit || '', style: S.note },
+          { v: it.note || '', style: S.note }
+        ], 5));
+      });
+    });
+    defs.push({
+      name: 'Inventor 建模参数', freeze: 1,
+      cols: [{ w: 18 }, { w: 30 }, { w: 26 }, { w: 12 }, { w: 72 }],
+      rows: [
+        pad([{ v: '十、Inventor 建模设计参数', style: S.title }], 5),
+        [],
+        pad([{ v: '用途：直接把下面尺寸输入 Autodesk Inventor（或 SolidWorks / Fusion 360）建立三维模型。', style: S.note }], 5),
+        pad([{ v: '长度单位统一为 mm，角度为 °；坐标原点建议取「机翼根弦前缘」，机身对称面为 XZ 平面。', style: S.note }], 5),
+        pad([{ v: '标 ★ 的条目是建模时最容易漏掉、但会直接影响装配的尺寸。', style: S.note }], 5),
+        [],
+        pad(kv('参数项合计', mp.length, '项', '按 ' + mpGroups.length + ' 个零件/系统分组：' + mpGroups.join(' / '), S.key), 5),
+        []
+      ].concat(mpRows)
+    });
+
     /* ---------- 11 约束校验 ---------- */
     const consRows = [header(['级别', '类别', '检查项', '实测值', '经验区间', '结论'])];
     (best.constraints || []).forEach(function (it) {
