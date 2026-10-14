@@ -92,6 +92,34 @@
     return { upper: up, lower: lo, meta: a };
   }
 
+  /**
+   * 闭合轮廓点序列（可直接导入 CAD / XFLR5）
+   * 顺序：前缘 → 后缘（上表面）→ 后缘 → 前缘（下表面），首尾不重复。
+   * 返回 { points: [[x, y], ...], N: 点数, meta }
+   * chord: 弦长（与输出坐标同单位，如 mm）；省略则输出归一化坐标（弦长 1）。
+   */
+  function contour(designation, n, chord) {
+    const c = coord(designation, n);
+    if (!c) return null;
+    const k = isFinite(chord) && chord > 0 ? chord : 1;
+    const pts = [];
+    // 上表面：前缘 → 后缘
+    for (let i = 0; i < c.upper.length; i++) pts.push([c.upper[i][0] * k, c.upper[i][1] * k]);
+    // 下表面：后缘 → 前缘，剔除首尾（与上表面的后缘、前缘重复）
+    for (let i = c.lower.length - 2; i >= 1; i--) pts.push([c.lower[i][0] * k, c.lower[i][1] * k]);
+    return { points: pts, N: pts.length, meta: c.meta, chord: k };
+  }
+
+  /** 输出为文本表格：sep 为分隔符（',' 用于 CSV，' ' 用于 .dat） */
+  function contourText(designation, n, chord, sep, digits) {
+    const c = contour(designation, n, chord);
+    if (!c) return '';
+    const d = digits == null ? 5 : digits, s = sep == null ? ' ' : sep;
+    return c.points.map(function (p) {
+      return p[0].toFixed(d) + s + p[1].toFixed(d);
+    }).join('\n');
+  }
+
   /* =======================================================================
    * 2. 内置翼型性能数据库
    *    clmax: 二维最大升力系数（Re≈1e5~3e5 模型尺度经验值）
@@ -405,6 +433,7 @@
     isa: isa, reynolds: reynolds,
     AIRFOILS: DB, DB: DB, t4: thicknessDist, thicknessDist: thicknessDist,
     camber4: camber4, camber5: camber5, shape: shape, coord: coord,
+    contour: contour, contourText: contourText,
     parse: parse, estimate: estimate, applyReynolds: applyReynolds,
     recommendAirfoils: recommendAirfoils,
     planform: planform, tailVolume: tailVolume, liftCurveSlope: liftCurveSlope,
