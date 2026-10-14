@@ -1387,6 +1387,179 @@
   }
 
   /* =======================================================================
+   * 12c. Inventor 建模设计参数
+   *      输出 3D 建模（Autodesk Inventor 等）直接可用的尺寸，
+   *      按零件分组：建模基准 / 机翼 / 副翼 / 机身 / 平尾 / 垂尾 /
+   *                  重心与电池仓 / 动力安装 / 结构与材料
+   *      长度一律给 mm（CAD 单位），角度给 °。
+   * ===================================================================== */
+  function modelingParams(plan) {
+    if (!plan || !plan.core) return [];
+    const c = plan.core, pf = c.planform || {}, t = c.tail || {}, cg = c.cg || {};
+    const pw = c.power || null, rw = c.rotary || null, st = c.structure || {};
+    // 注意：isFinite(null) 在 JS 中为 true（Number(null)===0），必须显式判断类型
+    const isNum = function (v) { return typeof v === 'number' && isFinite(v); };
+    const mm = function (m) { return isNum(m) ? +(m * 1000).toFixed(1) : null; };
+    const r1 = function (v) { return isNum(v) ? +v.toFixed(1) : null; };
+    const r2 = function (v) { return isNum(v) ? +v.toFixed(2) : null; };
+
+    // ---- 平尾几何（按梢根比 0.80 反推根弦/尖弦）----
+    const taperH = 0.8;
+    const bH = c.rotary ? null : c.tailSpanH;
+    const rootH = (!c.rotary && isNum(bH) && bH > 0) ? (2 * t.Sh) / (bH * (1 + taperH)) : null;
+    const tipH = rootH ? rootH * taperH : null;
+    // ---- 垂尾几何（取展弦比 1.40、梢根比 0.75）----
+    const ARv = 1.4, taperV = 0.75;
+    const hV = (!c.rotary && isNum(t.Sv)) ? Math.sqrt(t.Sv * ARv) : 0;
+    const rootV = (hV && hV > 0) ? (2 * t.Sv) / (hV * (1 + taperV)) : null;
+    const tipV = rootV ? rootV * taperV : null;
+    // ---- 舵面弦长 ----
+    const aileronChord = (!c.rotary && isNum(t.aileronRatio) && isNum(c.meanChord)) ? t.aileronRatio * c.meanChord : null;
+    const elevatorChord = (isNum(t.elevRatio) && isNum(rootH)) ? t.elevRatio * rootH : null;
+    const rudderChord = (isNum(t.rudderRatio) && isNum(rootV)) ? t.rudderRatio * rootV : null;
+
+    // ---- 电池仓尺寸（按 0.36 Wh/cm³ 体积能量密度反推，再留 4 mm 余量）----
+    let bayL = null, bayW = null, bayH = null;
+    if (pw) {
+      const wh = (pw.capacity / 1000) * pw.cells * 3.7;
+      const volMM = (wh / 0.36) * 1000;
+      const hh = Math.pow(volMM / 5.88, 1 / 3);
+      bayH = Math.ceil(hh + 4); bayW = Math.ceil(1.4 * hh + 4); bayL = Math.ceil(4.2 * hh + 6);
+    } else if (rw) {
+      bayH = 30; bayW = 45; bayL = 110;
+    }
+
+    // ---- 电机安装孔距（按电机定子尺寸经验取值）----
+    let mount = null;
+    if (pw && pw.motor) {
+      const s = String(pw.motor).replace(/\D/g, '');
+      const d = Number(s.slice(0, 2));
+      if (d <= 18) mount = [12, 16];
+      else if (d <= 23) mount = [16, 19];
+      else if (d <= 28) mount = [19, 25];
+      else if (d <= 35) mount = [25, 25];
+      else mount = [25, 32];
+    }
+
+    const propDiaMM = pw ? r1(pw.propIn * 25.4) : (rw ? mm(rw.rotorDia) : null);
+    const items = [];
+    const add = function (group, name, value, unit, note) {
+      items.push({ group: group, name: name, value: value, unit: unit || '', note: note || '' });
+    };
+
+    // ============ 建模基准 ============
+    add('建模基准', '坐标原点建议', '机翼根弦前缘', '', 'X 轴指向机尾，Y 轴指向右翼，Z 轴向上；机身对称面为 XZ 平面');
+    add('建模基准', '总长（机身）', mm(c.fuselageLength), 'mm', '机头最前端 → 尾端');
+    add('建模基准', '总翼展', mm(c.span), 'mm', '翼尖到翼尖（不含翼尖小翼）');
+    add('建模基准', '全机高度', r1((hV || 0) * 1000 + (st.sparDiaMM || 0) * 2) || null, 'mm', '机身下部 → 垂尾顶端');
+    add('建模基准', '整机建模单位', 'mm', '', 'Inventor 零件与装配统一用 mm，导出 STEP 前不要改比例');
+    add('建模基准', '引用翼型', c.airfoil ? c.airfoil.designation : '—', '',
+      c.airfoil ? (c.airfoil.series + '，厚度 ' + r1(c.airfoil.tc * 100) + '%，弯度 ' + r1(c.airfoil.camber * 100) + '%') : '');
+    add('建模基准', '翼型曲线生成方式', c.airfoil ? '按 ' + c.airfoil.designation + ' 公式生成' : '—', '',
+      '弦长归一化后按 4/5/6 位公式生成上下面坐标，再按各站位弦长缩放');
+
+    // ============ 机翼（仅固定翼）============
+    if (!c.rotary) {
+    add('机翼', '半翼展（单侧）', mm(c.span / 2), 'mm', '对称件：建一侧后镜像即可');
+    add('机翼', '根弦 cr', mm(pf.root), 'mm', '翼根（机身侧）弦长');
+    add('机翼', '尖弦 ct', mm(pf.tip), 'mm', '翼尖弦长');
+    add('机翼', '梢根比 λ', r2(c.taper), '', 'ct / cr');
+    add('机翼', '平均几何弦长 c̄', mm(c.meanChord), 'mm', 'c̄ = S / b');
+    add('机翼', '平均气动弦 MAC', mm(cg.mac), 'mm', '气动计算基准');
+    add('机翼', 'MAC 展向位置', mm(pf.yMac), 'mm', '从对称面量起，用于标注重心');
+    add('机翼', '机翼面积 S', isFinite(c.area) ? +(c.area * 1e4).toFixed(1) : null, 'cm²', '单侧 × 2');
+    add('机翼', '展弦比 AR', r2(c.ar), '', 'b² / S');
+    add('机翼', '上反角', r1(c.dihedral), '°', '左右翼各抬起的角度（从对称面量）');
+    add('机翼', '后掠角', r1(c.sweep), '°', '前缘后掠');
+    add('机翼', '扭转角（翼尖）', r1(c.twist), '°', '负值为气动扭转（洗流）');
+    add('机翼', '翼型厚度', r1((c.airfoil ? c.airfoil.tc : 0) * 100), '% 弦长', '最大厚度位置约 30% 弦长');
+    add('机翼', '翼型最大弯度', r1((c.airfoil ? c.airfoil.camber : 0) * 100), '% 弦长', c.airfoil && c.airfoil.pos ? ('位置 ' + r1(c.airfoil.pos * 100) + '% 弦长') : '');
+    add('机翼', '最大厚度（绝对值）', mm(pf.root * (c.airfoil ? c.airfoil.tc : 0)), 'mm', '按根弦算；翼尖按尖弦比例缩放');
+
+    // ============ 副翼 ============
+    add('副翼', '副翼弦长', mm(aileronChord), 'mm', '弦长比 ' + r1((t.aileronRatio || 0) * 100) + '%（相对平均弦长）');
+    add('副翼', '展向起点（距对称面）', mm(c.span * 0.17), 'mm', '约为半翼展的 34%，避开机身尾流');
+    add('副翼', '展向终点（距对称面）', mm(c.span * 0.45), 'mm', '约为半翼展的 90%，留 5% 翼尖不切');
+    add('副翼', '单侧副翼长度', mm(c.span * 0.28), 'mm', '副翼 + 襟副翼总展长');
+    add('副翼', '副翼面积（单侧）', isFinite(aileronChord) ? +((aileronChord * c.span * 0.28) * 1e4).toFixed(1) : null, 'cm²', '参考值');
+
+    // ============ 机身 ============
+    add('机身', '机身总长', mm(c.fuselageLength), 'mm', 'L = 0.35·cr + h_cg·cr + lh + c_t');
+    add('机身', '机头段长', mm(0.35 * pf.root), 'mm', '前端 → 机翼前缘（含电机座/防火墙）');
+    add('机身', '机翼安装段长', mm((cg.cgPct || 0) * pf.root), 'mm', '机翼前缘 → 重心位置');
+    add('机身', '尾段长（重心 → 平尾）', mm(t.lh), 'mm', '尾臂 lh，同时是垂尾的力臂 lv');
+    add('机身', '机身长 / 翼展', r2(c.fuselageRatio), '', '常规固定翼 0.55 ~ 0.85');
+    add('机身', '建议最大截面宽', r1(Math.max(28, (bayW || 40) + 4)), 'mm', '略大于电池仓宽度，便于装拆');
+    add('机身', '建议最大截面高', r1(Math.max(30, (bayH || 30) + 6)), 'mm', '需容纳电池 + 电调走线');
+    add('机身', '机头安装角（拉力线）', cg.thrustLine || '—', '', '电机轴相对翼弦的夹角');
+
+    // ============ 平尾 ============
+    add('平尾', '平尾翼展', mm(c.tailSpanH), 'mm', '含升降舵');
+    add('平尾', '平尾根弦', mm(rootH), 'mm', '按梢根比 0.80 反推');
+    add('平尾', '平尾尖弦', mm(tipH), 'mm', '');
+    add('平尾', '平尾面积', isFinite(t.Sh) ? +(t.Sh * 1e4).toFixed(1) : null, 'cm²', '尾容量 Vh = ' + r2(t.vh));
+    add('平尾', '尾臂 lh', mm(t.lh), 'mm', '机翼 MAC 25% → 平尾 MAC 25%');
+    add('平尾', '升降舵弦长', mm(elevatorChord), 'mm', '弦长比 ' + r1((t.elevRatio || 0) * 100) + '%');
+    add('平尾', '平尾安装角', '0 ~ -1', '°', '相对机翼弦线，略负以配平');
+
+    // ============ 垂尾 ============
+    add('垂尾', '垂尾高度', mm(hV), 'mm', '按展弦比 1.40 反推');
+    add('垂尾', '垂尾根弦', mm(rootV), 'mm', '按梢根比 0.75 反推');
+    add('垂尾', '垂尾尖弦', mm(tipV), 'mm', '');
+    add('垂尾', '垂尾面积', isFinite(t.Sv) ? +(t.Sv * 1e4).toFixed(1) : null, 'cm²', '尾容量 Vv = ' + r2(t.vv));
+    add('垂尾', '方向舵弦长', mm(rudderChord), 'mm', '弦长比 ' + r1((t.rudderRatio || 0) * 100) + '%');
+    add('垂尾', '垂尾后掠角', '0 ~ 10', '°', '常规 5°，竞速机可加大');
+    }  // end !rotary：机翼 / 副翼 / 平尾 / 垂尾 仅固定翼适用
+
+    // ============ 重心与电池仓 ============
+    add('重心与电池仓', 'MAC 位置', mm(cg.mac), 'mm', '从机翼根弦前缘往机尾量');
+    add('重心与电池仓', '气动焦点', r1((cg.acPct || 0) * 100), '% MAC', '距 MAC 前缘 ' + mm(cg.acMM) + ' mm');
+    add('重心与电池仓', '设计重心', r1((cg.cgPct || 0) * 100), '% MAC', '距 MAC 前缘 ' + mm(cg.cgMM) + ' mm');
+    add('重心与电池仓', '重心距机头', mm(0.35 * pf.root + (cg.cgMM || 0)), 'mm', '★ 建模时以此为基准标注电池仓位置');
+    add('重心与电池仓', '允许重心范围', r1((cg.cgPct || 0) * 100 - 5) + ' ~ ' + r1((cg.cgPct || 0) * 100 + 5), '% MAC',
+      '即 ' + mm((cg.cgMM || 0) - 0.05 * cg.mac) + ' ~ ' + mm((cg.cgMM || 0) + 0.05 * cg.mac) + ' mm（距 MAC 前缘）');
+    add('重心与电池仓', '静稳定裕度', r1(cg.staticMargin), '% MAC', '12 ~ 18% 为佳，越大越稳但越迟钝');
+    add('重心与电池仓', '电池仓尺寸（长×宽×高）', bayL ? (bayL + ' × ' + bayW + ' × ' + bayH) : '—', 'mm',
+      '已留 4~6 mm 装拆余量，仓体中心对准设计重心');
+    add('重心与电池仓', '电池规格', pw ? (pw.cells + 'S ' + pw.capacity + ' mAh') : (rw ? (rw.cells + 'S ' + rw.capacity + ' mAh') : '—'), '',
+      pw ? ('约 ' + r1(pw.energyWh) + ' Wh') : '');
+
+    // ============ 动力安装 ============
+    add('动力安装', '动力形式', pw ? '电动 + 定距螺旋桨' : (rw ? (rw.kind === 'helicopter' ? '电动直升机' : '多旋翼') : '—'), '', '');
+    if (pw) {
+      add('动力安装', '电机型号', pw.motor, '', (pw.kv || '') + ' KV，重约 ' + (pw.motorMass || '—') + ' g');
+      add('动力安装', '电机安装孔距', mount ? (mount[0] + ' × ' + mount[1]) : '—', 'mm', '十字孔距，M3 螺钉；建模时做通孔或预埋螺母');
+      add('动力安装', '电机最大直径', r1(pw.motor ? Number(String(pw.motor).replace(/\D/g, '').slice(0, 2)) + 4 : null) || '—', 'mm', '机身机头端需留出此直径');
+      add('动力安装', '螺旋桨', pw.propIn + ' × ' + pw.propPitch, 'in', '直径 ' + propDiaMM + ' mm');
+      add('动力安装', '桨盘所需净空', propDiaMM, 'mm', '★ 机身两侧、起落架、机翼下方都必须留出此直径的无阻挡空间');
+      add('动力安装', '建议离地净空', r1(propDiaMM * 0.15), 'mm', '约为桨径 15%，防止桨尖触地');
+      add('动力安装', '电调规格', pw.escA + ' A', '', '静态电流 ' + r1(pw.currentStatic) + ' A，留 30% 余量');
+      add('动力安装', '电机座倾角', '右拉 2 ~ 3', '°', '抵消螺旋桨反扭矩，建模时把电机座做成偏转面');
+    }
+    if (rw) {
+      add('动力安装', '旋翼数量', rw.nrotor, '个', '');
+      add('动力安装', '单桨直径', mm(rw.rotorDia), 'mm', '相邻桨尖间距建议 ≥ 桨径的 5%');
+      add('动力安装', '轴距（对角）', mm(rw.rotorDia * 1.414), 'mm', '四轴按正方形布置时的对角距离');
+      add('动力安装', '桨盘净空', mm(rw.rotorDia * 1.05), 'mm', '含机臂宽度');
+    }
+
+    // ============ 结构与材料 ============
+    add('结构与材料', '主体材料', st.materials || '—', '', '');
+    add('结构与材料', '设计过载', st.nLimit + ' G', '', '机翼需承受 ' + r1(st.nLimit * c.mass * 9.80665) + ' N 的升力');
+    add('结构与材料', '安全系数', st.safetyFactor, '', '');
+    add('结构与材料', '翼根弯矩', r1(st.rootMoment) + ' N·m', '', '建模时碳管主梁按此校核');
+    add('结构与材料', '碳管主梁直径', r1(st.sparDiaMM), 'mm', '★ 翼型内腔需留出此直径的圆孔；建议外径 ' + r1(st.sparDiaMM) + ' mm');
+    add('结构与材料', '主梁位置', '约 30% 弦长', '', '与翼型最大厚度位置重合，受力最优');
+    add('结构与材料', '翼肋间距', r1((st.ribSpacing || 0) * 1000), 'mm', '均布 ' + Math.max(2, Math.round((c.span / 2) / (st.ribSpacing || 0.15))) + ' 片/侧');
+    add('结构与材料', '副翼舵机扭矩', st.servoAileron + ' kg·cm', '', '共 2 个，装在机翼中段');
+    add('结构与材料', '升降舵舵机扭矩', st.servoElevator + ' kg·cm', '', '1 个，装机身尾段');
+    add('结构与材料', '方向舵舵机扭矩', st.servoRudder + ' kg·cm', '', '1 个，装机身尾段');
+    add('结构与材料', '舵机安装孔建议', 'M2 螺钉 × 4', '', '按所选舵机实际尺寸开孔，长宽各留 0.5 mm 间隙');
+
+    return items;
+  }
+
+  /* =======================================================================
    * 13. 命名模块（非必填）
    * ===================================================================== */
   const NAME_WORDS = {
@@ -1488,6 +1661,8 @@
       top3: plans, best: plans[0].plan, airfoilRecommendations: airfoilRec,
       // 全锚点取值汇总（含引擎计算出的其余锚点，如桨径 / 电机 KV / 续航等）
       anchorValues: anchorValues(plans[0].plan),
+      // Inventor 建模设计参数（按零件分组，长度统一 mm）
+      modelingParams: modelingParams(plans[0].plan),
       dimensionInfo: (inferred ? inferred.dims : []).map(function (d) { return DIMENSIONS[d]; })
     };
   }
@@ -1559,7 +1734,7 @@
     ANCHORS: ANCHORS, ANCHOR_BY_ID: ANCHOR_BY_ID, DIMENSIONS: DIMENSIONS,
     OBJECTIVES: OBJECTIVES,
     inferType: inferType, completeAnchors: completeAnchors, computeCore: computeCore,
-    anchorValues: anchorValues,
+    anchorValues: anchorValues, modelingParams: modelingParams,
     check: check, score: score, buildPlan: buildPlan, generateCandidates: generateCandidates,
     plan: plan, replan: replan, snapshot: snapshot,
     explain: explain, generateNames: generateNames, validateName: validateName,
