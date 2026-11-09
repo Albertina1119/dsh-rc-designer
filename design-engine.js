@@ -98,6 +98,30 @@
       notes: '低翼载高升阻比，巡航效率优先，滞空时间最大化。'
     },
     {
+      id: 'edf', name: '涵道风扇机', short: '涵道机', style: 'racer',
+      anchors: { ar: 3.6, wl: 95, twr: 0.75, vmax: 38, span: 0.9, mass: 1.1 },
+      range: {
+        ar: [2.8, 5.0], wl: [65, 150], twr: [0.45, 1.3], vmax: [28, 62], stall: [11, 22],
+        vh: [0.30, 0.55], vv: [0.022, 0.048], sm: [6, 16], re: [1.8e5, 9e5], pmax: [350, 1100],
+        fus: [0.68, 1.02]
+      },
+      weights: { stability: 0.95, range: 0.45, speed: 1.65, cost: 0.75, easyfly: 0.6, buildability: 0.8 },
+      notes: '涵道风扇（EDF）推进：小展弦比薄翼 + 高翼载，靠风扇静推力起飞，推重比通常 0.5~0.8，加速与高速段表现好但低速升力紧张。',
+      powerKind: 'edf'
+    },
+    {
+      id: 'jet', name: '小型喷气机', short: '喷气机', style: 'racer',
+      anchors: { ar: 4.2, wl: 140, twr: 0.85, vmax: 62, span: 1.5, mass: 6.0 },
+      range: {
+        ar: [3.2, 6.5], wl: [95, 230], twr: [0.55, 1.5], vmax: [42, 105], stall: [14, 28],
+        vh: [0.26, 0.50], vv: [0.020, 0.045], sm: [8, 20], re: [4.5e5, 3e6], pmax: [800, 4000],
+        fus: [0.72, 1.05]
+      },
+      weights: { stability: 1.0, range: 0.5, speed: 1.85, cost: 0.55, easyfly: 0.45, buildability: 0.6 },
+      notes: '微型涡喷推进：翼载高、速度段高，起飞滑跑长，燃油按分钟消耗，起降与散热是主要难点。',
+      powerKind: 'turbine'
+    },
+    {
       id: 'multirotor', name: '多旋翼', short: '多旋翼', style: 'cargo', rotary: true,
       anchors: { wl: 90, twr: 2.0, vmax: 15, mass: 1.5, disk: 80, nrotor: 4 },
       range: {
@@ -750,7 +774,95 @@
     const payload = isFinite(inp.payload) ? inp.payload : 0;
     let power = null, rotary = null;
 
-    if (!type.rotary) {
+    /* ---------- 涵道风扇（EDF）/ 微型涡喷（turbine）动力 ----------
+     * 这两种机型不用「电机 KV × 桨径」模型：
+     *   EDF      → 由目标静推力选定标准涵道直径，功率按 3.4 g/W 折算
+     *   turbine  → 由目标静推力选定涡喷推力级别，续航按燃油消耗率折算
+     * 输出字段与螺旋桨方案保持一致（cells/voltage/capacity/escA/staticThrust/
+     * currentStatic/powerStatic/enduranceMin…），便于下游 Excel / 建模 / 校验复用。
+     */
+    if (!type.rotary && (type.powerKind === 'edf' || type.powerKind === 'turbine')) {
+      const twrT = isFinite(inp.twr) ? inp.twr : 0.65;
+      const targetThrustT = twrT * W;
+      const V0 = isFinite(inp.voltage) ? inp.voltage : 22.2;
+      const cells0 = isFinite(inp.cells) ? inp.cells : Math.max(1, Math.round(V0 / 3.7));
+
+      if (type.powerKind === 'edf') {
+        // 标准涵道级别：直径 mm → 额定静推力 N（工程经验值）
+        const EDF = [
+          { mm: 50, th: 6.0, mass: 55, a: 30 }, { mm: 64, th: 11.0, mass: 85, a: 45 },
+          { mm: 70, th: 15.0, mass: 110, a: 55 }, { mm: 80, th: 20.5, mass: 150, a: 70 },
+          { mm: 90, th: 27.0, mass: 205, a: 85 }, { mm: 105, th: 35.0, mass: 290, a: 105 },
+          { mm: 120, th: 46.0, mass: 400, a: 130 }
+        ];
+        const pickEd = EDF.reduce(function (b, e) {
+          return Math.abs(e.th - targetThrustT) < Math.abs(b.th - targetThrustT) ? e : b;
+        }, EDF[0]);
+        const thrustN = pickEd.th;
+        const effGW = 3.4;
+        const pElec = (thrustN * 1000 / 9.80665) / effGW;      // W
+        const currentA = pElec / V0;
+        const capaT = isFinite(inp.capa) ? inp.capa : Math.round(2200 + 900 * cells0);
+        const energyWh = (capaT / 1000) * (cells0 * 3.7);
+        const pCruiseElec = pElec * 0.62;
+        const enduranceMin = (energyWh * 0.8) / Math.max(8, pCruiseElec) * 60;
+        const escA = Math.max(30, Math.ceil((currentA * 1.3) / 5) * 5);
+        power = {
+          kind: 'edf', twrTarget: twrT, targetThrust: targetThrustT,
+          staticThrust: round(thrustN, 2), staticTwr: round(thrustN / W, 3),
+          propIn: round(pickEd.mm / 25.4, 1), propPitch: 0, pitchRatio: 0,
+          pitchSpeed: round(30000 + pickEd.mm * 220, 0),
+          kv: 0, motor: 'EDF ' + pickEd.mm + 'mm', motorMass: pickEd.mass, motorImax: pickEd.a,
+          cells: cells0, voltage: round(V0, 1), capacity: capaT,
+          powerStatic: round(pElec, 1), powerStaticMech: round(pElec * 0.88, 1),
+          powerCruiseMech: round(pCruiseElec * 0.88, 1), powerCruiseElec: round(pCruiseElec, 1),
+          currentStatic: round(currentA, 2), currentCruise: round(pCruiseElec / V0, 2),
+          rpmStatic: round(30000 + pickEd.mm * 220, 0),
+          loadFactor: round(thrustN / W, 3), escA: escA,
+          energyWh: round(energyWh, 2), enduranceMin: round(enduranceMin, 1),
+          vCruise: round(clamp((type.anchors.vmax || 35) * 0.78, vStall * 1.25, 90), 2),
+          diskLoadingProp: round(thrustN / (Math.PI * Math.pow(pickEd.mm / 1000 / 2, 2)), 1),
+          efficiency: 0.88,        // 电机 + 风扇总效率
+          edfMm: pickEd.mm, autoSelected: true, warnings: []
+        };
+      } else {
+        // 微型涡喷：推力级别（kg）与燃油
+        const TURB = [
+          { kg: 2.0, mass: 380, flow: 0.28 }, { kg: 3.0, mass: 520, flow: 0.38 },
+          { kg: 4.0, mass: 680, flow: 0.48 }, { kg: 6.0, mass: 900, flow: 0.66 },
+          { kg: 8.0, mass: 1150, flow: 0.85 }, { kg: 12.0, mass: 1600, flow: 1.20 }
+        ];
+        const tgtKg = targetThrustT / 9.80665;
+        const pickT = TURB.reduce(function (b, t) {
+          return Math.abs(t.kg - tgtKg) < Math.abs(b.kg - tgtKg) ? t : b;
+        }, TURB[0]);
+        const thrustN = pickT.kg * 9.80665;
+        // 燃油：按级别给出油箱容积（L）与消耗率（L/min）
+        const fuelL = clamp(round(pickT.flow * 16, 1), 1.0, 12.0);
+        const fuelFlow = pickT.flow;                       // L/min
+        const enduranceMin = round((fuelL * 0.85) / Math.max(0.05, fuelFlow), 1);
+        // 等效轴功：喷流功率 ≈ 推力 × 有效排气速度（约 180 m/s 量级）
+        const pMech = thrustN * 180;
+        power = {
+          kind: 'turbine', twrTarget: twrT, targetThrust: targetThrustT,
+          staticThrust: round(thrustN, 2), staticTwr: round(thrustN / W, 3),
+          propIn: round(40 + pickT.kg * 6, 1), propPitch: 0, pitchRatio: 0,
+          pitchSpeed: round(180, 0),
+          kv: 0, motor: '涡喷 ' + pickT.kg.toFixed(1) + ' kg', motorMass: pickT.mass, motorImax: 0,
+          cells: 0, voltage: 7.4, capacity: 0,
+          powerStatic: round(pMech, 0), powerStaticMech: round(pMech, 0),
+          powerCruiseMech: round(pMech * 0.8, 0), powerCruiseElec: round(pMech * 0.8, 0),
+          currentStatic: 0, currentCruise: 0,
+          rpmStatic: round(60000 + pickT.kg * 25000, 0),
+          loadFactor: round(thrustN / W, 3), escA: 0,
+          energyWh: round(fuelL * 9.6, 2), enduranceMin: enduranceMin,
+          vCruise: round(clamp((type.anchors.vmax || 60) * 0.78, vStall * 1.25, 150), 2),
+          diskLoadingProp: 0, efficiency: 0.42,   // 热力→推力总效率
+          turbineKg: pickT.kg, fuelL: fuelL, fuelFlow: pickT.flow,
+          autoSelected: true, warnings: []
+        };
+      }
+    } else if (!type.rotary) {
       const twr = isFinite(inp.twr) ? inp.twr : 0.65;
       const targetThrust = twr * W;
       const V = isFinite(inp.voltage) ? inp.voltage : 11.1;
@@ -915,6 +1027,9 @@
       cargo: '泡沫夹芯 + 碳管桁架',
       endurance: '碳管主梁 + 泡沫/玻璃纤维蒙皮',
       multirotor: '碳纤维机架板 + 铝柱',
+      trainer: '轻木 + 巴尔沙蒙皮 / EPP 泡沫',
+      edf: '轻木构架 + 玻璃纤维蒙皮，涵道筒碳纤/玻纤',
+      jet: '碳纤维 + 玻璃纤维复合，蜂窝夹芯承力',
       heli: '碳纤维机身板 + 铝合金传动'
     }[type.id] || '轻木/泡沫常规结构';
 
@@ -951,19 +1066,48 @@
    * ===================================================================== */
   function check(core, type) {
     const items = [];
-    const add = function (level, cat, name, value, band, msg) {
-      items.push({ level: level, cat: cat, name: name, value: value, band: band, msg: msg });
+    /**
+     * 三级校验：level ∈ 'ok' | 'warn' | 'error'
+     * 每项都带 advice（可执行建议），界面层据此显示「等级 + 提示 + 建议」。
+     * 兼容说明：level 字段沿用原有取值，旧调用方（Excel 导出等）无需改动。
+     */
+    const add = function (level, cat, name, value, band, msg, advice) {
+      items.push({
+        level: level, cat: cat, name: name, value: value, band: band, msg: msg,
+        advice: advice || (level === 'ok' ? '无需调整' : '请按提示方向调整该参数')
+      });
     };
-    const soft = function (v, band, cat, name, unit, lowMsg, highMsg) {
+    /**
+     * 经验区间校验：
+     *   - 在区间内 → ok
+     *   - 只要超出区间（不论多少）→ 至少 warn，绝不显示「通过」
+     *   - 偏差很大 → 仍为 warn（错误级别只留给物理不可行项，以免把可行方案判死）
+     */
+    const soft = function (v, band, cat, name, unit, lowMsg, highMsg, adviceLow, adviceHigh) {
       if (!band || band[1] <= 0 || !isFinite(v)) return;
+      const u = unit || '';
       const p = bandPenalty(v, band, 1);
-      if (p === 0) { add('ok', cat, name, round(v, 2) + unit, band[0] + '~' + band[1] + unit, '在经验区间内'); return; }
-      const level = p > 0.22 ? 'warn' : 'ok';
-      add(level, cat, name, round(v, 2) + unit, band[0] + '~' + band[1] + unit, v < band[0] ? lowMsg : highMsg);
+      const rangeTxt = band[0] + '~' + band[1] + u;
+      if (p === 0) {
+        add('ok', cat, name, round(v, 2) + u, rangeTxt, '在经验区间内', '无需调整');
+        return;
+      }
+      const tooLow = v < band[0];
+      const cur = round(v, 2);
+      const adv = tooLow
+        ? (adviceLow || ('把 ' + name + ' 提高到 ' + band[0] + u + ' 以上（当前 ' + cur + u + '）'))
+        : (adviceHigh || ('把 ' + name + ' 降低到 ' + band[1] + u + ' 以下（当前 ' + cur + u + '）'));
+      add('warn', cat, name, cur + u, rangeTxt, tooLow ? lowMsg : highMsg, adv);
     };
-    const cross = function (cond, cat, name, value, msg, level) {
-      if (cond) items.push({ level: level || 'warn', cat: cat, name: name, value: value, band: '—', msg: msg });
-      else items.push({ level: 'ok', cat: cat, name: name, value: value, band: '—', msg: '无冲突' });
+    const cross = function (cond, cat, name, value, msg, level, advice) {
+      if (cond) {
+        items.push({
+          level: level || 'warn', cat: cat, name: name, value: value, band: '—', msg: msg,
+          advice: advice || '按提示方向调整相关参数后重新生成'
+        });
+      } else {
+        items.push({ level: 'ok', cat: cat, name: name, value: value, band: '—', msg: '无冲突', advice: '无需调整' });
+      }
     };
     const R = type.range;
 
@@ -989,8 +1133,14 @@
 
     // --- 经验区间（软/硬交叉） ---
     if (!type.rotary) {
-      soft(core.ar, R.ar, '经验', '展弦比', '', '展弦比偏小，诱导阻力大、滑翔差', '展弦比偏大，结构刚度与滚转惯量变差');
-      soft(core.wlGdm2, R.wl, '经验', '翼载', ' g/dm²', '翼载偏低，抗风性差', '翼载偏高，失速速度上升、起降变难');
+      soft(core.ar, R.ar, '经验', '展弦比', '', '展弦比偏小，诱导阻力大、滑翔差', '展弦比偏大，结构刚度与滚转惯量变差',
+        '加大翼展或减小翼面积，把展弦比提到 ' + R.ar[0] + ' 以上',
+        '缩短翼展或加大弦长，把展弦比降到 ' + R.ar[1] + ' 以下');
+      soft(core.vStall, R.stall, '经验', '失速速度', ' m/s', '失速速度偏低，翼载过小、抗风差', '失速速度偏高，起降与低速盘旋困难',
+        '加大翼载（减小翼面积或加载）或换用更高 CLmax 的翼型', '加大翼面积、降低翼载，或换用高升力翼型');
+      soft(core.wlGdm2, R.wl, '经验', '翼载', ' g/dm²', '翼载偏低，抗风性差', '翼载偏高，失速速度上升、起降变难',
+        '加大翼面积或减重，把这翼载提到 ' + R.wl[0] + ' 以上',
+        '加大翼面积或减重，把翼载降到 ' + R.wl[1] + ' 以下');
       soft(core.tail.vh, R.vh, '经验', '平尾容量 Vh', '', '平尾容量偏小，俯仰稳定性不足', '平尾容量偏大，平尾阻力与重量增加');
       soft(core.tail.vv, R.vv, '经验', '垂尾容量 Vv', '', '垂尾容量偏小，航向稳定性不足', '垂尾容量偏大，垂尾阻力增加');
       soft(core.cg.staticMargin, R.sm, '经验', '静稳定裕度', ' %MAC', '静稳定裕度偏小，纵向易发散', '静稳定裕度偏大，俯仰配平阻力大、机动迟钝');
@@ -1609,7 +1759,7 @@
     second2: ['Hawk', 'Arrow', 'Falcon', 'Rider', 'Wing', 'Drift', 'Lark', 'Spirit', 'Kite', 'Voyager'],
     callsign: ['先锋', '游隼', '夜航', '长风', '极光', '猎鹰', '轻骑', '白鹭', '远望', '疾风']
   };
-  const TYPE_CN = { trainer: '教练', glider: '滑翔', '3d': '特技', racer: '竞速', cargo: '驮运', endurance: '巡航', multirotor: '旋翼', heli: '直升机' };
+  const TYPE_CN = { trainer: '教练', glider: '滑翔', '3d': '特技', racer: '竞速', cargo: '驮运', endurance: '巡航', edf: '涵道', jet: '喷气', multirotor: '旋翼', heli: '直升机' };
 
   function generateNames(plan, type, batch) {
     const n = batch == null ? 0 : batch;
