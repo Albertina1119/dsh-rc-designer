@@ -10,6 +10,10 @@
 <meta name="robots" content="index,follow">
 <meta name="theme-color" content="#0b1220">
 <link rel="canonical" href="https://albertina1119.github.io/dsh-rc-designer/">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="航模设计器">
+<meta name="application-name" content="航模设计器">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="RC 飞行器总体设计器">
 <meta property="og:title" content="RC 飞行器总体设计器 · 数值锚点驱动方案推荐">
@@ -418,6 +422,10 @@ table.cmp td.best{color:var(--ok);font-weight:700}
 .casecard .cwhy{font-size:11.5px;color:var(--tx2);line-height:1.85;margin:0 0 9px}
 .casecard ul{font-size:11px;color:var(--tx3);line-height:1.8;padding-left:17px;margin:0 0 12px}
 .faqlist{display:flex;flex-direction:column;gap:8px}
+.faqsearch{display:flex;gap:9px;align-items:center;margin-bottom:11px;flex-wrap:wrap}
+.faqsearch input{flex:1;min-width:220px;min-height:38px;padding:7px 11px;border-radius:8px;
+  border:1px solid var(--line);background:var(--bg2);color:var(--tx);font-size:12.5px;font-family:inherit}
+.faqsearch input:focus{outline:none;border-color:var(--acc)}
 .faqitem{border:1px solid var(--line);border-radius:9px;overflow:hidden}
 .faqq{padding:11px 14px;font-size:12.5px;color:var(--tx);cursor:pointer;display:flex;
   justify-content:space-between;gap:10px;align-items:center;background:rgba(255,255,255,.03)}
@@ -470,7 +478,58 @@ table.cmp td.best{color:var(--ok);font-weight:700}
 .compliance .ci b{color:var(--tx2);font-weight:500}
 .compliance .dis{font-size:10px;color:var(--tx3);margin-top:9px;line-height:1.75;padding-top:8px;border-top:1px dashed var(--line)}
 
-/* 移动端 */
+/* ---------- 三视图 / 3D 预览 ---------- */
+.vdbar{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+.vdbtns{display:flex;gap:6px;flex-wrap:wrap}
+.vdbtns .btn{padding:5px 10px;font-size:11px}
+.vdbtns .btn.on{background:rgba(76,201,240,.2);border-color:var(--acc);color:var(--acc)}
+.vdstage{width:100%;height:340px;border-radius:10px;overflow:hidden;
+  border:1px solid var(--line);background:#0d1526;position:relative;touch-action:none}
+.vdstage canvas{display:block;width:100%!important;height:100%!important}
+@media (max-width:900px){.vdstage{height:260px}}
+
+/* PWA 更新条 */
+.swupdate{position:fixed;left:0;right:0;bottom:0;z-index:260;display:none;align-items:center;
+  justify-content:center;gap:10px;padding:11px 16px;background:#16233c;
+  border-top:1px solid var(--acc);font-size:12.5px;color:var(--tx2);flex-wrap:wrap}
+.swupdate.on{display:flex}
+
+/* ---------- 校验建议列 / BOM / 制造文件 / 移动端 ---------- */
+.checks td.adv{font-size:10.5px;color:var(--warn);line-height:1.6;min-width:150px}
+.checks td.adv.dim{color:var(--tx3)}
+
+.bomgroup{border:1px solid var(--line);border-radius:9px;margin-bottom:9px;overflow:hidden}
+.bomhead{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 11px;
+  background:rgba(255,255,255,.04);font-size:11.5px;color:var(--tx2);flex-wrap:wrap}
+.bomhead b{color:var(--tx)}
+.bomhead .qty{font-size:10px;padding:1px 7px;border-radius:10px;background:rgba(76,201,240,.16);color:var(--acc)}
+.bomrow{display:flex;justify-content:space-between;gap:10px;padding:8px 11px;
+  border-top:1px solid rgba(255,255,255,.05);font-size:11px;align-items:flex-start;flex-wrap:wrap}
+.bomrow.best{background:rgba(57,217,138,.06)}
+.bomrow .bmain{flex:1;min-width:150px}
+.bomrow .bname{color:var(--tx);font-weight:600;font-size:11.5px}
+.bomrow .bname .rank{font-size:9px;padding:1px 5px;border-radius:4px;margin-right:5px;
+  background:rgba(57,217,138,.2);color:var(--ok)}
+.bomrow .bmeta{color:var(--tx3);margin-top:3px;line-height:1.6}
+.bomrow .bside{text-align:right;color:var(--tx3);font-size:10.5px;white-space:nowrap}
+.bomrow .bside b{color:var(--warn);font-weight:500}
+.bomrow .buy{display:inline-block;margin-top:4px;padding:2px 8px;border-radius:6px;
+  background:rgba(76,201,240,.16);color:var(--acc);text-decoration:none;font-size:10px}
+.bomrow .buy:hover{background:rgba(76,201,240,.28)}
+.bomnone{font-size:11px;color:var(--tx3);padding:6px 11px}
+
+.cadbtns{display:flex;flex-direction:column;gap:7px;margin-top:4px}
+.cadbtns .btn{width:100%;justify-content:center}
+
+/* 移动端：折叠分组 / 步骤条 / 纵向按钮 / 44px 点击区 */
+.stepbar{display:none;gap:4px;padding:10px 12px 2px;overflow-x:auto;align-items:center}
+.stepbar .st{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--tx3);white-space:nowrap}
+.stepbar .st .dot{width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:9.5px;background:rgba(255,255,255,.07);color:var(--tx3)}
+.stepbar .st.on .dot{background:var(--acc);color:#06202b;font-weight:700}
+.stepbar .st.on{color:var(--acc)}
+.stepbar .st.done .dot{background:rgba(57,217,138,.28);color:var(--ok)}
+.stepbar .sep{width:10px;height:1px;background:var(--line);flex:0 0 10px}
 @media (max-width:900px){
   header{flex-wrap:wrap;gap:8px;padding:9px 12px}
   .mainnav{margin-left:0;order:3;width:100%;overflow-x:auto}
@@ -478,9 +537,25 @@ table.cmp td.best{color:var(--ok);font-weight:700}
   .aboutgrid{grid-template-columns:1fr;gap:10px}
   .caselist,.glosslist{grid-template-columns:1fr}
   .page{padding:18px 13px 50px}
-  .wrap{grid-template-columns:1fr !important;padding:10px}
+  .wrap{grid-template-columns:1fr !important;padding:8px}
   .col-left,.col-mid,.col-right{width:100%}
+  .stepbar{display:flex}
+  .collapsed .body{display:none}
+  .card h2{cursor:pointer;position:relative}
+  .card h2::after{content:'▾';position:absolute;right:2px;top:2px;font-size:11px;color:var(--tx3)}
+  .collapsed h2::after{content:'▸'}
+  .card .body{padding-top:2px}
+  .btn,.btn.sm{min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+  .btnrow{flex-direction:column}
+  .btnrow .btn{width:100%}
+  .checks{font-size:10px;display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .checks th,.checks td{padding:4px 5px}
+  .af,.scores{overflow-x:auto}
+  body{overflow-x:hidden}
+  .card{overflow:hidden}
 }
+
+
 </style>
 </head>
 <body>
@@ -560,6 +635,10 @@ table.cmp td.best{color:var(--ok);font-weight:700}
       <li><b>看结果 / 导出</b>：右栏「完整参数」逐项核对，点「建模」可拿 Inventor 尺寸与翼型坐标，最后导出 Excel。</li>
     </ol>
     <h2>常见问题</h2>
+    <div class="faqsearch">
+      <input type="search" id="faqKw" placeholder="搜索问题关键词，如 锚点 / 校验 / BOM / DXF / 离线" autocomplete="off">
+      <span class="hint" id="faqCount"></span>
+    </div>
     <div id="faqList" class="faqlist"></div>
     <h2>术语词典</h2>
     <p class="pagesub">正文里带下划虚线的词，鼠标悬停即可看到释义。</p>
@@ -609,6 +688,14 @@ table.cmp td.best{color:var(--ok);font-weight:700}
 
 <!-- ==================== 视图：设计器（原有三栏） ==================== -->
 <div class="wrap" id="view-design">
+
+  <div class="stepbar" id="stepBar">
+    <div class="st" data-s="1"><span class="dot">1</span>选机型</div><span class="sep"></span>
+    <div class="st" data-s="2"><span class="dot">2</span>给锚点</div><span class="sep"></span>
+    <div class="st" data-s="3"><span class="dot">3</span>生成方案</div><span class="sep"></span>
+    <div class="st" data-s="4"><span class="dot">4</span>核对参数</div><span class="sep"></span>
+    <div class="st" data-s="5"><span class="dot">5</span>导出</div>
+  </div>
 
   <!-- ============ 左栏 ============ -->
   <div class="col col-left">
@@ -740,6 +827,43 @@ table.cmp td.best{color:var(--ok);font-weight:700}
       </div>
     </div>
 
+    <div class="card" id="card3d" style="display:none">
+      <h2><span class="n">9b</span>三视图 / 3D 预览<span class="r" id="vdSum">正交相机 · 线框</span></h2>
+      <div class="body">
+        <div class="vdbar">
+          <div class="vdbtns" id="vdViews">
+            <button class="btn sm" data-v="top">顶视</button>
+            <button class="btn sm" data-v="side">侧视</button>
+            <button class="btn sm" data-v="front">前视</button>
+            <button class="btn sm" data-v="iso">轴测</button>
+          </div>
+          <div class="vdbtns">
+            <button class="btn sm" id="vdQuad">四视图</button>
+            <button class="btn sm" id="vdSingle">单视图</button>
+            <button class="btn sm ghost" id="vdReset">复位</button>
+          </div>
+        </div>
+        <div id="vdStage" class="vdstage"></div>
+        <div class="hint" style="margin-top:7px">
+          正交相机不产生近大远小变形，适合看比例与装配关系。左键拖拽旋转、滚轮缩放、右键/Shift 拖拽平移。
+          手机默认单视图，用上面按钮切换。线框由翼型坐标、翼展、弦长、机身长度与尾翼参数实时生成。
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="cardBom" style="display:none">
+      <h2><span class="n">10c</span>器件清单与 BOM<span class="r" id="bomSum"></span></h2>
+      <div class="body">
+        <div class="hint" style="margin-bottom:9px">按「目标推力 → 电压 → 机型兼容 → 推力余量/重量/价格」排序，每类给出前三名。
+          未收录购买链接的器件只显示型号，不显示购买按钮。</div>
+        <div id="bomBody"></div>
+        <div class="btnrow" style="margin-top:11px">
+          <button class="btn sm" id="btnBomJson">⤓ 导出 BOM JSON</button>
+          <button class="btn sm" id="btnBomCsv">⤓ 导出 BOM CSV</button>
+        </div>
+      </div>
+    </div>
+
     <div class="card" id="cardName" style="display:none">
       <h2><span class="n">11</span>飞机命名<span class="r">非必填</span></h2>
       <div class="body">
@@ -777,6 +901,13 @@ table.cmp td.best{color:var(--ok);font-weight:700}
 
 <div class="toast" id="toast"></div>
 
+<!-- PWA 更新提示 -->
+<div class="swupdate" id="swUpdate">
+  <span>🔄 检测到新版本，刷新后即可使用。</span>
+  <button class="btn sm pri" id="swReload">立即刷新</button>
+  <button class="btn sm ghost" id="swLater">稍后</button>
+</div>
+
 <div id="glossTip"></div>
 
 <div id="tour">
@@ -803,10 +934,14 @@ table.cmp td.best{color:var(--ok);font-weight:700}
   </div>
 </div>
 
+<script src="vendor/three.min.js"></script>
 <script src="airfoil-lib.js"></script>
 <script src="design-engine.js"></script>
 <script src="xlsx-export.js"></script>
 <script src="app-shell.js"></script>
+<script src="devices-lib.js"></script>
+<script src="cad-export.js"></script>
+<script src="viewer3d.js"></script>
 <script>
 /* =====================================================================
  * 应用状态
@@ -889,6 +1024,16 @@ function renderTypes() {
 /* =====================================================================
  * 左栏：锚点
  * =================================================================== */
+/** 文本文件下载（全局，供建模 / BOM / 制造文件共用） */
+function dlText(name, text, mime) {
+  const blob = new Blob(['\ufeff' + text], { type: (mime || 'text/plain') + ';charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+
 /** 取某个锚点在当前方案里的引擎计算值 */
 function computedAnchor(id) {
   if (!S.result || !S.result.anchorValues) return null;
@@ -1656,6 +1801,14 @@ function renderParams() {
       const afChord = S.afChord != null ? S.afChord : +(c.planform.root * 1000).toFixed(1);
       const cc = (typeof AeroLib !== 'undefined' && AeroLib.contour) ? AeroLib.contour(afName, afN, afChord) : null;
       rows.push('<tr><td colspan="4" style="padding:14px 0 4px;font-size:11.5px;font-weight:600;' +
+        'color:var(--acc);letter-spacing:.5px">● 制造文件（可直接加工）</td></tr>');
+      rows.push('<tr><td colspan="4"><div style="font-size:11px;color:var(--tx3);margin-bottom:7px">' +
+        '翼肋 DXF 单位 mm、闭合多段线，含主梁过孔图层；机身 SVG 含轮廓、机翼厚度参考线与尺寸标注。</div>' +
+        '<div class="cadbtns">' +
+        '<button class="btn sm pri" id="btnRibDxf">⤓ 下载翼肋 DXF（' + afName + '，弦长 ' + afChord + ' mm）</button>' +
+        '<button class="btn sm" id="btnFuseSvg">⤓ 下载机身侧视 SVG</button>' +
+        '</div></td></tr>');
+      rows.push('<tr><td colspan="4" style="padding:14px 0 4px;font-size:11.5px;font-weight:600;' +
         'color:var(--acc);letter-spacing:.5px">● 翼型坐标点表（导入 Inventor 直接生成翼型曲线）</td></tr>');
       rows.push('<tr><td colspan="4" style="padding:2px 0 8px">' +
         '<div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">' +
@@ -1741,14 +1894,6 @@ function renderParams() {
   body.innerHTML = rows.join('');
 
   /* ---- 建模页：复制 / 下载 / 打印 ---- */
-  const dlText = (name, text, mime) => {
-    const blob = new Blob(['\ufeff' + text], { type: (mime || 'text/plain') + ';charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    document.body.appendChild(a); a.click();
-    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-  };
   const copyText = (text, label) => {
     const done = () => toast(label + '已复制到剪贴板', 'ok');
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1830,21 +1975,41 @@ function renderChecks() {
   const p = S.result.top3[S.selected].plan;
   const box = $('checkWrap');
   const items = p.constraints || [];
+  const LV = {
+    ok: { t: '通过', cls: 'ok' },
+    warn: { t: '警告', cls: 'warn' },
+    error: { t: '错误', cls: 'err' }
+  };
   const nE = items.filter(i => i.level === 'error').length;
   const nW = items.filter(i => i.level === 'warn').length;
-  $('checkSum').innerHTML = nE
-    ? '<span class="badge err">' + nE + ' 项不通过</span>'
-    : (nW ? '<span class="badge warn">' + nW + ' 项警告</span>' : '<span class="badge ok">全部通过</span>');
+  const nO = items.filter(i => i.level === 'ok').length;
+  $('checkSum').innerHTML =
+    '<span class="badge ok">' + nO + ' 通过</span>' +
+    (nW ? ' <span class="badge warn">' + nW + ' 警告</span>' : '') +
+    (nE ? ' <span class="badge err">' + nE + ' 错误</span>' : '');
   box.innerHTML =
-    '<table class="checks"><thead><tr><th>结论</th><th>类别</th><th>检查项</th><th>实测</th><th>经验区间</th><th>说明</th></tr></thead><tbody>' +
+    '<table class="checks"><thead><tr>' +
+    '<th>等级</th><th>类别</th><th>检查项</th><th>实测</th><th>经验区间</th>' +
+    '<th>提示信息</th><th>可执行建议</th></tr></thead><tbody>' +
     items.map(it => {
-      const cls = it.level === 'error' ? 'err' : it.level === 'warn' ? 'warn' : '';
-      const badge = it.level === 'error' ? '<span class="badge err">不通过</span>'
-        : it.level === 'warn' ? '<span class="badge warn">警告</span>' : '<span class="badge ok">通过</span>';
-      return '<tr class="' + cls + '"><td>' + badge + '</td><td>' + it.cat + '</td><td>' + it.name +
-        '</td><td style="font-variant-numeric:tabular-nums">' + it.value + '</td><td class="pf">' + it.band +
-        '</td><td class="pf">' + it.msg + '</td></tr>';
-    }).join('') + '</tbody></table>';
+      const lv = LV[it.level] || LV.ok;
+      const cls = it.level === 'error' ? 'err' : (it.level === 'warn' ? 'warn' : '');
+      const adv = it.advice || (it.level === 'ok' ? '无需调整' : '按提示方向调整');
+      return '<tr class="' + cls + '">' +
+        '<td><span class="badge ' + lv.cls + '">' + lv.t + '</span></td>' +
+        '<td class="pf">' + it.cat + '</td>' +
+        '<td>' + it.name + '</td>' +
+        '<td style="font-variant-numeric:tabular-nums;white-space:nowrap">' + it.value + '</td>' +
+        '<td class="pf" style="white-space:nowrap">' + (it.band || '—') + '</td>' +
+        '<td class="pf">' + it.msg + '</td>' +
+        '<td class="adv' + (it.level === 'ok' ? ' dim' : '') + '">' +
+        (it.level === 'ok' ? '—' : '→ ' + adv) + '</td>' +
+        '</tr>';
+    }).join('') + '</tbody></table>' +
+    '<div class="hint" style="margin-top:8px">三级校验：<b style="color:var(--ok)">通过</b> = 在经验区间内；' +
+    '<b style="color:var(--warn)">警告</b> = 超出该机型经验区间但物理可行（<b>任何超出区间的项都不会显示通过</b>）；' +
+    '<b style="color:var(--err)">错误</b> = 物理或几何上不成立，必须修正。' +
+    '经验区间随机型不同（当前：' + (S.result.typeName || '—') + '）。</div>';
 }
 
 /* ---------- 评分 ---------- */
@@ -2397,61 +2562,71 @@ function doImportProject(file) {
 function renderCases() {
   const box = $('caseList');
   box.innerHTML = '';
+  const DIFF = ['', '★', '★★', '★★★', '★★★★', '★★★★★'];
   SH.CASES.forEach(c => {
     const d = document.createElement('div');
     d.className = 'casecard';
+    const recKeys = Object.keys(c.recommended || {});
     d.innerHTML =
       '<span class="ctag">' + esc(c.tag) + '</span>' +
       '<h3>' + esc(c.name) + '</h3>' +
-      '<p class="cwhy">' + esc(c.why) + '</p>' +
-      '<ul>' + c.points.map(p => '<li>' + esc(p) + '</li>').join('') + '</ul>' +
-      '<div class="pm" style="margin-bottom:9px">锚点：' +
+      '<div class="pm" style="margin:4px 0 8px">难度 <b style="color:var(--warn)">' + (DIFF[c.difficulty] || '') +
+      '（' + c.difficulty + '/5）</b>　机型 <b>' + esc(DesignEngine.TYPE_BY_ID[c.typeId] ? DesignEngine.TYPE_BY_ID[c.typeId].name : c.typeId) + '</b></div>' +
+      '<p class="cwhy"><b>设计目标：</b>' + esc(c.goal || '') + '</p>' +
+      '<p class="cwhy"><b>设计思路：</b>' + esc(c.why) + '</p>' +
+      '<ul>' + (c.points || []).map(p => '<li>' + esc(p) + '</li>').join('') + '</ul>' +
+      '<div class="pm" style="margin-bottom:7px"><b>数值锚点：</b>' +
       Object.keys(c.anchors).map(k => {
         const m = DesignEngine.ANCHOR_BY_ID[k];
         return (m ? m.label : k) + ' = ' + c.anchors[k] + (m && m.unit ? ' ' + m.unit : '');
       }).join('　·　') + '</div>' +
-      '<button class="btn sm pri" data-case="' + c.id + '">载入到设计器</button>';
+      (recKeys.length ? '<div class="pm" style="margin-bottom:9px"><b>推荐参数：</b>' +
+        recKeys.map(k => esc(k) + ' ' + esc(c.recommended[k])).join('　·　') + '</div>' : '') +
+      '<button class="btn sm pri" data-case="' + c.id + '">载入到设计器并计算</button>';
     box.appendChild(d);
     d.querySelector('button').onclick = () => {
       S.typeId = c.typeId;
       S.anchors = JSON.parse(JSON.stringify(c.anchors));
       S.locks = {};
       S.name = c.name;
+      CUR_PROJECT = null;
       showView('design');
       renderTypes(); renderAnchors();
       doPlan();
+      updateStepBar();
       toast('已载入案例「' + c.name + '」', 'ok');
     };
   });
 }
 
 /* ---------- FAQ / 术语 / changelog ---------- */
-const FAQ = [
-  { q: '为什么至少要 2 个锚点？', a: '引擎靠「两个以上不同维度」的约束做交叉推理。只给一个参数时，可行解空间太大，任何结果都谈不上推荐。给 2~4 个覆盖重量/几何 + 动力/性能的锚点，推荐质量最好。' },
-  { q: '「引擎推荐值」关掉后会发生什么？', a: '关闭后进入「纯输入模式」：引擎只用你给的锚点 + 机型模板默认值计算，不做联动推导也不择优。因此当你的锚点与模板的物理关系对不上时，综合得分会明显下降（常见掉 10 分以上）——这正是它诚实的地方。两个模式的得分会在中栏顶部同时显示。' },
-  { q: '分数低是不是设计不好？', a: '不一定。评分是「相对该机型目标」的加权，低分通常意味着：你的锚点组合偏离了该机型的典型配置，或某些指标互相冲突。看右侧「约束校验」里具体的警告项，比只看总分有用。' },
-  { q: '设计数据存在哪里？会丢吗？', a: '保存在你浏览器的 localStorage。刷新、关标签页都不会丢；但清浏览器缓存、换设备、用无痕窗口会丢。重要方案请用「导出 .dshproj」备份。' },
-  { q: '分享链接为什么不用登录？', a: '因为参数就编码在网址里（#d= 后面那段），对方打开时由他自己的浏览器解码并重算，全程没有服务器参与。好处是零成本、不泄露账号；代价是链接不能实时更新，改了就生成新链接。' },
-  { q: '导出的 Excel 里那些数字可靠吗？', a: '引擎用的是公开的气动与工程经验公式（详见 Excel 的「公式依赖」表，37 条公式逐条列出）。它是<strong>概念设计工具</strong>，用于快速收敛方案与发现明显冲突，不能替代风洞、CFD 或实际试飞。' },
-  { q: '能直接拿去制造吗？', a: '右栏「建模」标签给的是 Inventor/ SolidWorks 可用的尺寸，含翼型坐标点表（可导入生成翼型曲线）。但结构强度、工艺余量、装配公差仍需你按实际材料复核。' },
-  { q: '支持多旋翼和直升机吗？', a: '支持。旋翼机型用「桨盘载荷 + 旋翼数」作为主约束，会跳过机翼与尾翼参数，输出桨径、轴距、悬停功率等。' }
-];
 
-function renderFaq() {
+
+function renderFaq(kw) {
   const box = $('faqList');
-  if (box.dataset.done) return;
-  box.dataset.done = '1';
-  FAQ.forEach((f, i) => {
-    const d = document.createElement('div');
-    d.className = 'faqitem';
-    d.innerHTML = '<div class="faqq"><span>' + esc(f.q) + '</span><span>＋</span></div>' +
-      '<div class="faqa">' + f.a + '</div>';
-    d.querySelector('.faqq').onclick = () => {
+  const q = String(kw == null ? (S.faqKw || '') : kw).trim().toLowerCase();
+  S.faqKw = q;
+  const list = SH.FAQ || [];
+  const hit = q ? list.filter(f => (f.q + ' ' + f.a).toLowerCase().indexOf(q) >= 0) : list;
+  box.innerHTML = hit.length
+    ? hit.map((f, i) => {
+      const open = !!q;   // 搜索时自动展开命中项
+      return '<div class="faqitem' + (open ? ' on' : '') + '">' +
+        '<div class="faqq"><span>' + esc(f.q) + '</span><span>' + (open ? '－' : '＋') + '</span></div>' +
+        '<div class="faqa">' + f.a + '</div></div>';
+    }).join('')
+    : '<div class="empty2">没有匹配「' + esc(q) + '」的问题。试试「锚点」「校验」「BOM」「DXF」「离线」。</div>';
+  box.querySelectorAll('.faqitem').forEach(function (d) {
+    const h = d.querySelector('.faqq');
+    if (!h) return;
+    h.onclick = function () {
       d.classList.toggle('on');
-      d.querySelector('.faqq span:last-child').textContent = d.classList.contains('on') ? '－' : '＋';
+      const sp = d.querySelector('.faqq span:last-child');
+      if (sp) sp.textContent = d.classList.contains('on') ? '－' : '＋';
     };
-    box.appendChild(d);
   });
+  const cnt = $('faqCount');
+  if (cnt) cnt.textContent = hit.length + ' / ' + list.length + ' 题';
 }
 
 function renderGlossary() {
@@ -2579,6 +2754,10 @@ $('btnSaveNew').onclick = doSave;
 $('btnShare').onclick = () => openShare();
 $('btnImport').onclick = () => $('filePick').click();
 $('btnExport').onclick = () => doExportProject();
+if ($('faqKw')) {
+  $('faqKw').oninput = (e) => renderFaq(e.target.value);
+  $('faqKw').onkeydown = (e) => { if (e.key === 'Enter') renderFaq(e.target.value); };
+}
 $('filePick').onchange = (e) => {
   const f = e.target.files && e.target.files[0];
   if (f) doImportProject(f);
@@ -2604,7 +2783,254 @@ const _renderPlansOrig = renderPlans;
 renderPlans = function (res) {
   _renderPlansOrig(res);
   try { renderCompliance(); } catch (e) {}
+  try { renderBom(); } catch (e) { console.warn(e); }
+  try { updateStepBar(); } catch (e) {}
+  try { vdInit(); } catch (e) { console.warn('3D 预览初始化失败', e); }
 };
+
+/* =====================================================================
+ * 三视图 / 3D 预览（Three.js，懒加载：只有用户展开该卡片才初始化 WebGL）
+ * =================================================================== */
+let VD = null, VD_LAYOUT = 'quad';
+function vdGeometry() {
+  if (!S.result) return null;
+  const plan = S.result.top3[S.selected].plan;
+  const c = plan.core;
+  const ct = (c.airfoil && AeroLib.contour)
+    ? AeroLib.contour(c.airfoil.designation, 40, c.planform.root)
+    : null;
+  return Viewer3D.buildGeometry(c, S.result.modelingParams, ct);
+}
+function vdInit(force) {
+  const card = $('card3d');
+  if (!card) return;
+  if (!S.result) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const stage = $('vdStage');
+  if (!stage) return;
+  if (!window.THREE) {
+    // Three.js 未加载（离线首访或文件缺失）
+    $('vdSum').innerHTML = '<span class="badge warn">Three.js 未加载</span>';
+    stage.innerHTML = '<div style="padding:26px;text-align:center;color:var(--tx3);font-size:11.5px">' +
+      '三维预览需要 vendor/three.min.js。<br>当前无法加载，其他功能不受影响。</div>';
+    return;
+  }
+  if (!VD) {
+    const isMobile = window.matchMedia && window.matchMedia('(max-width:900px)').matches;
+    VD_LAYOUT = isMobile ? 'single' : 'quad';
+    VD = Viewer3D.createViewer(stage, { layout: VD_LAYOUT, active: 'iso' });
+    if (!VD || !VD.ok) {
+      stage.innerHTML = '<div style="padding:26px;text-align:center;color:var(--tx3);font-size:11.5px">' +
+        '无法初始化 WebGL（可能是浏览器/显卡限制）。' +
+        (VD && VD.error ? '<br>' + VD.error : '') + '</div>';
+      VD = null;
+      return;
+    }
+    VD.setLayout(VD_LAYOUT);
+    bindVdButtons();
+  }
+  if (force !== false) VD.setGeometry(vdGeometry());
+  $('vdSum').innerHTML = '<span class="badge ok">正交相机 · 线框</span>';
+}
+function bindVdButtons() {
+  document.querySelectorAll('#vdViews [data-v]').forEach(function (b) {
+    b.onclick = function () {
+      if (!VD) return;
+      VD.setActive(b.dataset.v);
+      VD_LAYOUT = 'single';
+      markVd();
+    };
+  });
+  if ($('vdQuad')) $('vdQuad').onclick = function () {
+    if (!VD) return;
+    VD.setLayout('quad'); VD_LAYOUT = 'quad'; markVd();
+  };
+  if ($('vdSingle')) $('vdSingle').onclick = function () {
+    if (!VD) return;
+    VD.setLayout('single'); VD_LAYOUT = 'single'; markVd();
+  };
+  if ($('vdReset')) $('vdReset').onclick = function () {
+    if (!VD) return;
+    VD.rot.x = 0.6; VD.rot.y = 0.8; VD.dist = 2.2;
+    VD.target.x = 0; VD.target.y = 0;
+    VD.refresh();
+  };
+  markVd();
+}
+function markVd() {
+  if ($('vdQuad')) $('vdQuad').classList.toggle('on', VD_LAYOUT === 'quad');
+  if ($('vdSingle')) $('vdSingle').classList.toggle('on', VD_LAYOUT === 'single');
+}
+
+/* =====================================================================
+ * 器件清单与 BOM
+ * =================================================================== */
+let CUR_BOM = null;
+function renderBom() {
+  const card = $('cardBom'), box = $('bomBody');
+  if (!S.result) { card.style.display = 'none'; return; }
+  if (!window.DevicesLib) { card.style.display = 'none'; return; }
+  const plan = S.result.top3[S.selected].plan;
+  const type = DesignEngine.TYPE_BY_ID[S.result.typeId];
+  let bom = null;
+  try { bom = DevicesLib.buildBom(plan.core, type); } catch (e) { console.warn(e); }
+  if (!bom || !bom.ok) { card.style.display = 'none'; return; }
+  CUR_BOM = bom;
+  card.style.display = '';
+  const nOK = bom.items.filter(it => it.best).length;
+  $('bomSum').innerHTML =
+    '<span class="badge ' + (nOK === bom.items.length ? 'ok' : 'warn') + '">' +
+    nOK + '/' + bom.items.length + ' 类已匹配</span>';
+  box.innerHTML = bom.items.map(function (it) {
+    if (!it.best) {
+      return '<div class="bomgroup"><div class="bomhead"><span><b>' + it.group + '</b>　' + it.note +
+        '</span><span class="qty">×' + it.qty + '</span></div>' +
+        '<div class="bomnone">库中暂无满足条件的型号，可放宽推力/电压要求或手动选型。</div></div>';
+    }
+    const rows = it.candidates.map(function (c, i) {
+      const d = c.device;
+      const buy = d.link
+        ? ' <a class="buy" href="' + d.link + '" target="_blank" rel="noopener noreferrer">查看购买</a>'
+        : '';
+      const spec = Object.keys(d.spec || {}).map(function (k) { return k + ': ' + d.spec[k]; }).join('　');
+      return '<div class="bomrow' + (i === 0 ? ' best' : '') + '">' +
+        '<div class="bmain">' +
+        '<div class="bname">' + (i === 0 ? '<span class="rank">推荐</span>' : '<span class="rank" style="background:rgba(255,255,255,.08);color:var(--tx3)">备选 ' + (i + 1) + '</span>') +
+        d.brand + ' ' + d.name + '</div>' +
+        '<div class="bmeta">' + spec + buy + '</div>' +
+        '<div class="bmeta" style="color:var(--tx3)">' + c.reason + '</div>' +
+        '</div>' +
+        '<div class="bside">' + d.weight + ' g<br><b>' + DevicesLib.priceRankText(d.price) + '</b></div>' +
+        '</div>';
+    }).join('');
+    return '<div class="bomgroup"><div class="bomhead"><span><b>' + it.group + '</b>　' + it.note +
+      '</span><span class="qty">×' + it.qty + '</span></div>' + rows + '</div>';
+  }).join('') +
+    '<div class="hint" style="margin-top:6px">整套参考价约 <b style="color:var(--warn)">¥' + bom.priceEstimate +
+    '</b>（' + bom.priceNote + '）</div>';
+}
+
+$('btnBomJson').onclick = function () {
+  if (!CUR_BOM) { toast('请先生成方案', 'err'); return; }
+  const txt = DevicesLib.bomToJson(CUR_BOM, { name: S.name || (S.naming && S.naming.name) || '方案' });
+  dlText((S.name || '方案') + '_BOM.json', txt, 'application/json');
+  toast('BOM JSON 已导出', 'ok');
+};
+$('btnBomCsv').onclick = function () {
+  if (!CUR_BOM) { toast('请先生成方案', 'err'); return; }
+  const csv = DevicesLib.bomToCsv(CUR_BOM);
+  dlText((S.name || '方案') + '_BOM.csv', csv, 'text/csv');
+  toast('BOM CSV 已导出', 'ok');
+};
+
+/* =====================================================================
+ * 制造文件：翼肋 DXF / 机身侧视 SVG
+ * =================================================================== */
+function cadAirfoil() {
+  const plan = S.result.top3[S.selected].plan;
+  const c = plan.core;
+  const af = c.airfoil ? c.airfoil.designation : 'NACA 2412';
+  const chordMM = +(c.planform.root * 1000).toFixed(1);
+  return { af: af, chordMM: chordMM, contour: AeroLib.contour(af, 80, chordMM) };
+}
+$('btnRibDxf').onclick = function () {
+  if (!S.result) { toast('请先生成方案', 'err'); return; }
+  const a = cadAirfoil();
+  const spar = (S.result.best.core.structure && S.result.best.core.structure.sparDiaMM) || 6;
+  const r = CadExport.ribDxf(a.contour, { chordMM: a.chordMM, airfoil: a.af, sparDiaMM: spar, sparPosPct: 30 });
+  if (!r.ok) { toast('DXF 生成失败：' + r.error, 'err'); return; }
+  dlText(r.filename, r.dxf, 'application/dxf');
+  toast('翼肋 DXF 已导出（' + r.pointCount + ' 点，弦长 ' + Math.round(a.chordMM) + ' mm）', 'ok');
+};
+$('btnFuseSvg').onclick = function () {
+  if (!S.result) { toast('请先生成方案', 'err'); return; }
+  const plan = S.result.top3[S.selected].plan;
+  const geo = CadExport.geoFromCore(plan.core, S.result.modelingParams,
+    { typeName: S.result.typeName, projectName: S.name || (S.naming && S.naming.name) || '方案' });
+  const r = CadExport.fuselageSvg(geo);
+  if (!r.ok) { toast('SVG 生成失败', 'err'); return; }
+  dlText(r.filename, r.svg, 'image/svg+xml');
+  toast('机身侧视 SVG 已导出（' + r.width + '×' + r.height + '）', 'ok');
+};
+
+/* =====================================================================
+ * 移动端：步骤条 / 卡片折叠
+ * =================================================================== */
+function updateStepBar() {
+  const bar = $('stepBar');
+  if (!bar) return;
+  const n = Object.keys(S.anchors).length;
+  const done = [true, n >= 2, !!S.result, !!S.result, !!S.result];
+  bar.querySelectorAll('.st').forEach(function (el) {
+    const s = Number(el.dataset.s);
+    el.className = 'st' + (done[s - 1] ? (s <= 3 ? ' done' : '') : '') +
+      (s === (S.result ? 4 : (n >= 2 ? 3 : 2)) ? ' on' : '');
+  });
+}
+// 移动端点击标题折叠/展开卡片
+document.querySelectorAll('#view-design .card').forEach(function (card) {
+  const h = card.querySelector('h2');
+  if (!h) return;
+  h.addEventListener('click', function (e) {
+    if (window.innerWidth > 900) return;
+    if (e.target.closest('button,a,select,input')) return;
+    card.classList.toggle('collapsed');
+  });
+});
+if (window.matchMedia && window.matchMedia('(max-width:900px)').matches) {
+  // 手机上默认折叠次要卡片，只展开关键的两张
+  document.querySelectorAll('#view-design .card').forEach(function (card) {
+    if (card.id === 'cardName' || card.id === 'cardBom' || card.id === 'cardCompliance' ||
+      card.id === 'cardCheck' || card.id === 'cardReason') card.classList.add('collapsed');
+  });
+}
+
+/* =====================================================================
+ * PWA：注册 Service Worker + 更新提示
+ * =================================================================== */
+let SW_REG = null, SW_WAITING = null;
+function showUpdateBar() {
+  const bar = $('swUpdate');
+  if (bar) bar.classList.add('on');
+}
+function bindWaiting(reg) {
+  SW_REG = reg;
+  if (!reg) return;
+  if (reg.waiting) { SW_WAITING = reg.waiting; showUpdateBar(); }
+  reg.addEventListener('updatefound', function () {
+    const nw = reg.installing;
+    if (!nw) return;
+    nw.addEventListener('statechange', function () {
+      if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+        SW_WAITING = nw;
+        showUpdateBar();
+      }
+    });
+  });
+}
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').then(function (reg) {
+      bindWaiting(reg);
+      // 每次启动检查一次更新
+      if (reg.update) reg.update().catch(function () {});
+    }).catch(function (e) { console.warn('SW 注册失败（离线模式不可用）', e); });
+  });
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (window.__swReloading) return;
+    window.__swReloading = 1;
+    location.reload();
+  });
+}
+if ($('swReload')) {
+  $('swReload').onclick = function () {
+    if (SW_WAITING) { SW_WAITING.postMessage({ type: 'SKIP_WAITING' }); }
+    else location.reload();
+  };
+}
+if ($('swLater')) {
+  $('swLater').onclick = function () { $('swUpdate').classList.remove('on'); };
+}
 
 /* ---------- 启动 ---------- */
 updateProjBadge();
