@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# 设计器本身是单页应用，所有功能都在首页
+Sitemap: https://albertina1119.github.io/dsh-rc-designer/sitemap.xml
