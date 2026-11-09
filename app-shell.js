@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '1.3.0';
+  const VERSION = '1.4.0';
   const SCHEMA = 'dsh-project@1';
   const STORE_KEY = 'dsh.rcDesigner.v1';
 
@@ -532,6 +532,15 @@
    * 8. Changelog
    * =================================================================== */
   const CHANGELOG = [
+    {
+      version: '1.4.0', date: '2026-10-15',
+      highlights: [
+        '界面改为两段式：第 1 段选机型与锚点，第 2 段换页显示三套推荐方案',
+        '结果页三套方案横排对比，3D 三视图移到方案旁，完整参数与 SGP 清单分列',
+        '3D 线框重绘：翼型展向放样、机身锥形分段、分组配色（翼青/身蓝/尾绿/桨橙），修正坐标轴',
+        '消除中栏大片留白，输入页改两栏并补「怎么给锚点」引导卡'
+      ]
+    },
     {
       version: '1.3.0', date: '2026-10-15',
       highlights: [
