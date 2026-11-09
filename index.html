@@ -2975,7 +2975,7 @@ function showStage(which) {
       if (VD && VD.refresh) VD.refresh();
     }, 60);
   }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  try { if (window.scrollTo) window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
 }
 
 /* ---------- 按钮接线 ---------- */
