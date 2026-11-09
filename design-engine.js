@@ -1109,6 +1109,32 @@
         items.push({ level: 'ok', cat: cat, name: name, value: value, band: '—', msg: '无冲突', advice: '无需调整' });
       }
     };
+    /**
+     * 关系型校验（带方向的不等式）。
+     * ⚠ 修复的 Bug：旧写法把实测值硬编码成「X < 下限」/「X > 上限」，
+     * 条件不成立时也照样显示违反符号，于是界面上出现「0.72 < 0.45 → 通过」这种
+     * 自相矛盾的结论。本函数按真实关系输出 ≥ / ≤ / < / >，并把限值放进「经验区间」列。
+     *
+     * @param dir 'min' = 期望 actual ≥ limit（越大越好）；'max' = 期望 actual ≤ limit（越小越好）
+     * @param errRatio 超出限值多少比例后升级为「错误」（默认 0.25，即 25%）
+     */
+    const rel = function (actual, limit, dir, cat, name, unit, msgOk, msgBad, adviceBad, errRatio) {
+      if (!isFinite(actual) || !isFinite(limit)) return;
+      const u = unit || '';
+      const a = round(actual, 2), L = round(limit, 2);
+      const pass = dir === 'min' ? actual >= limit : actual <= limit;
+      const symOk = dir === 'min' ? '≥' : '≤';
+      const symBad = dir === 'min' ? '<' : '>';
+      const band = symOk + ' ' + L + u + (dir === 'min' ? '（下限）' : '（上限）');
+      if (pass) {
+        add('ok', cat, name, a + u + ' ' + symOk + ' ' + L + u, band, msgOk || '满足该机型要求', '无需调整');
+        return;
+      }
+      const bad = Math.abs(actual - limit) / Math.max(1e-9, Math.abs(limit));
+      const level = bad > (isFinite(errRatio) ? errRatio : 0.25) ? 'error' : 'warn';
+      add(level, cat, name, a + u + ' ' + symBad + ' ' + L + u, band,
+        msgBad || '偏离该机型要求', adviceBad || ('把 ' + name + ' 调到 ' + band + ' 以内'));
+    };
     const R = type.range;
 
     if (type.rotary) {
@@ -1154,31 +1180,52 @@
 
     // --- 交叉冲突 ---
     if (!type.rotary) {
-      cross(core.vStall > (type.range.stall[1]),
-        '交叉', '失速速度 vs 机型期望', round(core.vStall, 1) + ' m/s > ' + type.range.stall[1],
-        '失速速度超出该机型期望上限，需加大翼面积或减轻重量', core.vStall > type.range.stall[1] * 1.25 ? 'error' : 'warn');
-      cross(core.perf.thrustToWeight < type.range.twr[0],
-        '交叉', '推重比 vs 机型期望', round(core.perf.thrustToWeight, 2) + ' < ' + type.range.twr[0],
-        '可用推重比低于该机型下限，爬升与加速能力不足', core.perf.thrustToWeight < type.range.twr[0] * 0.75 ? 'error' : 'warn');
+      rel(core.vStall, type.range.stall[1], 'max', '交叉', '失速速度 vs 机型期望', ' m/s',
+        '失速速度不超过该机型期望上限',
+        '失速速度超出该机型期望上限，起降与低速盘旋会变难',
+        '加大翼面积或减轻重量，把失速速度降到 ' + type.range.stall[1] + ' m/s 以下', 0.25);
+      rel(core.perf.thrustToWeight, type.range.twr[0], 'min', '交叉', '推重比 vs 机型期望', '',
+        '推重比达到该机型下限，爬升与加速能力够用',
+        '可用推重比低于该机型下限，爬升与加速能力不足',
+        '换更大推力的动力组合（加大桨径 / 提高 KV 或电压 / 降低起飞重量），把推重比提到 ' +
+        type.range.twr[0] + ' 以上', 0.25);
       cross(core.wlGdm2 > type.range.wl[1] && core.perf.thrustToWeight < 0.7,
-        '交叉', '高翼载 + 低推重比', round(core.wlGdm2, 0) + ' g/dm² / T/W ' + round(core.perf.thrustToWeight, 2),
-        '高翼载与低推重比同时出现，起飞距离与盘旋性能会明显恶化');
+        '交叉', '高翼载 + 低推重比',
+        round(core.wlGdm2, 0) + ' g/dm²（上限 ' + type.range.wl[1] + '） / T/W ' + round(core.perf.thrustToWeight, 2),
+        '高翼载与低推重比同时出现，起飞距离与盘旋性能会明显恶化',
+        'warn',
+        '优先加大翼面积降低翼载；至少把推重比提到 0.7 以上再试飞');
       cross(core.power && core.power.rpmStatic > 45000 && core.power.propIn < 7,
         '交叉', '电机 KV / 桨径 / 电压匹配', core.power ? round(core.power.rpmStatic, 0) + ' rpm @ ' + core.power.propIn + 'in' : '—',
-        '转速过高而桨径偏小，推力效率低，建议降低 KV 或加大桨径');
+        '转速过高而桨径偏小，推力效率低', 'warn',
+        '降低电机 KV 或加大桨径（一般让转速落在 30000 rpm 以内效率最好）');
       cross(core.power && core.power.escA > 0 && core.power.escA > 120,
-        '交叉', '电调电流余量', core.power ? core.power.escA + ' A' : '—', '所需电调规格过大，建议提高电压或降低功率');
+        '交叉', '电调电流余量', core.power ? core.power.escA + ' A（上限 120 A）' : '—',
+        '所需电调规格过大，建议提高电压或降低功率', 'warn',
+        '提高电池节数（同样功率下电流更低）或减重以小功率配置');
       cross(core.cg.staticMargin < type.range.sm[0] * 1.6 && type.style === '3d' && core.cg.staticMargin < 3,
-        '交叉', '3D 机重心过前', round(core.cg.staticMargin, 1) + ' %MAC', '3D 机需要靠后的重心，否则无法悬停与平旋');
+        '交叉', '3D 机重心过前', round(core.cg.staticMargin, 1) + ' %MAC（3D 需 ≤ 3）',
+        '3D 机需要靠后的重心，否则无法悬停与平旋', 'warn',
+        '把电池后移，让重心落到 MAC 的 3% 以内（首飞仍建议先留 5% 余量）');
     } else {
       const tw = core.rotary.twrTarget;
-      cross(tw < type.range.twr[0], '交叉', '推重比 vs 机型期望', round(tw, 2) + ' < ' + type.range.twr[0],
-        '推重比不足，抗风与机动能力差', tw < type.range.twr[0] * 0.85 ? 'error' : 'warn');
-      cross(core.rotary.enduranceMin < 3, '交叉', '续航 vs 电池', round(core.rotary.enduranceMin, 1) + ' min',
-        '悬停续航不足 3 分钟，需加大电池容量或减轻重量');
+      rel(tw, type.range.twr[0], 'min', '交叉', '推重比 vs 机型期望', '',
+        '推重比达到该机型下限',
+        '推重比不足，抗风与机动能力差',
+        '加大桨径 / 提高电压 / 减重，把推重比提到 ' + type.range.twr[0] + ' 以上', 0.15);
+      rel(core.rotary.enduranceMin, 3, 'min', '交叉', '续航 vs 电池', ' min',
+        '悬停续航不低于 3 分钟',
+        '悬停续航不足 3 分钟，需加大电池容量或减轻重量',
+        '加大电池容量（mAh）或减重；若已接近结构极限，考虑提高电压以降低电流', 0.34);
     }
-    cross(core.aStall3d < 6, '交叉', '失速迎角', round(core.aStall3d, 1) + '°', '可用失速迎角过小，操纵窗口窄');
-    cross(core.ldMax < 4, '交叉', '最大升阻比', round(core.ldMax, 1), '升阻比过低，巡航效率差');
+    rel(core.aStall3d, 6, 'min', '交叉', '失速迎角', '°',
+      '可用失速迎角够用',
+      '可用失速迎角过小，操纵窗口窄',
+      '换用厚度更大或弯度更高的翼型（如 2412 → 4415），提高失速迎角', 0.17);
+    rel(core.ldMax, 4, 'min', '交叉', '最大升阻比', '',
+      '升阻比够用',
+      '升阻比过低，巡航效率差',
+      '加大展弦比、换低阻翼型，或降低翼载以减小诱导阻力', 0.25);
 
     return items;
   }
