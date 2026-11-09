@@ -1,0 +1,48 @@
+{
+  "name": "RC 飞行器总体设计器 · 数值锚点驱动",
+  "short_name": "航模设计器",
+  "description": "输入数值锚点，自动补全整套航模总体参数并推荐 NACA 翼型，给出 Top3 方案与约束校验，导出 Excel 与 Inventor 建模参数。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "categories": ["design", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "我的项目",
+      "short_name": "项目",
+      "url": "./index.html#view=projects",
+      "description": "打开已保存的设计方案"
+    },
+    {
+      "name": "案例库",
+      "short_name": "案例",
+      "url": "./index.html#view=cases",
+      "description": "六个标杆案例"
+    }
+  ]
+}
