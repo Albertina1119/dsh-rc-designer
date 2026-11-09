@@ -20,157 +20,199 @@
 
   /* =====================================================================
    * 1. 纯数据：几何构建（不依赖 Three.js，可在 Node 里测试）
-   *    统一单位：米。返回 { parts: [{ name, kind, data }] }
+   *
+   * 坐标约定（直接采用 Three.js 右手系，避免渲染时再换算）：
+   *   X = 展向（右翼 +X，左翼 -X）
+   *   Y = 向上（机背 +Y）
+   *   Z = 前后（机头 -Z，机尾 +Z）
+   * 单位：米。
    * =================================================================== */
   function buildGeometry(core, modeling, contour) {
     const c = core || {};
     const pf = c.planform || {};
     const t = c.tail || {};
-    const mm = function (v) { return isFinite(v) ? v : null; };
+    const num = function (v, d) { return isFinite(v) ? v : d; };
     const m = {};
     (modeling || []).forEach(function (it) { m[it.name] = it.value; });
 
-    const span = num(pf.span, c.span) || 1.2;
+    const span = num(pf.span, num(c.span, 1.2));
     const root = num(pf.root, 0.24);
     const tip = num(pf.tip, root * 0.7);
-    const fusL = mm(m['机身总长']) ? m['机身总长'] / 1000 : (num(c.fuselageLength, 0.9));
+    const fusL = isFinite(m['机身总长']) ? m['机身总长'] / 1000 : num(c.fuselageLength, 0.9);
     const tailSpan = num(c.tailSpanH, span * 0.36);
     const tailChord = num(c.tailChordH, root * 0.6);
-    const lh = num(t.lh, fusL * 0.55);
-    const finH = mm(m['垂尾高度']) ? m['垂尾高度'] / 1000 : root * 1.6;
-    const finRoot = mm(m['垂尾根弦']) ? m['垂尾根弦'] / 1000 : tailChord * 1.1;
+    const finH = isFinite(m['垂尾高度']) ? m['垂尾高度'] / 1000 : root * 1.5;
+    const finRoot = isFinite(m['垂尾根弦']) ? m['垂尾根弦'] / 1000 : tailChord * 1.1;
+    const dihedral = num(c.dihedral, 0) * Math.PI / 180;
+    const sweep = num(c.sweep, 0) * Math.PI / 180;
 
     const parts = [];
+    const WING = 'wing', BODY = 'body', TAIL = 'tail', ROTOR = 'rotor';
 
-    // ---- 机翼：按翼型轮廓放样成上下两条轮廓线 + 若干翼肋站位 ----
-    const pts = (contour && contour.points) ? contour.points.map(function (p) {
-      return [p[0] / (contour.chord || 1), p[1] / (contour.chord || 1)];   // 归一化
-    }) : defaultAirfoil();
-    const stations = 9;
-    const wingLines = [];
-    for (let i = 0; i < stations; i++) {
-      const f = i / (stations - 1);                      // 0=根 1=尖
-      const y = f * span / 2;                             // 半翼展
+    /* ---------- 机翼：翼型放样线框 ---------- */
+    const prof = (contour && contour.points && contour.points.length > 8)
+      ? contour.points.map(function (p) {
+        const k = contour.chord || 1;
+        return [p[0] / k, p[1] / k];       // 归一化 (0=前缘, 1=后缘)
+      })
+      : defaultAirfoil();
+
+    // 机身中心线位置：机翼前缘放在重心附近偏后
+    const cgPct = num(c.cg && c.cg.cgPct, 0.35);
+    const noseZ = -fusL * 0.45;
+    const bodyZ0 = noseZ;
+    const bodyZ1 = fusL * 0.55;
+    const zLE = noseZ + fusL * (0.30 + cgPct * 0.25);   // 翼根前缘 z
+    const yWing = 0.02;                                  // 机翼相对机身中心线的高度
+
+    // 站位（半翼展方向）：少而精，0..5 共 6 个，让线框像「面」而不是「梳子」
+    const ST = 6;
+    const stations = [];
+    for (let i = 0; i < ST; i++) {
+      const f = i / (ST - 1);
       const chord = root + (tip - root) * f;
-      const zOff = -f * 0;                                // 后掠为 0
-      const dih = f * span / 2 * Math.tan((num(c.dihedral, 5) * Math.PI) / 180);
-      const loop = [];
-      for (let k = 0; k < pts.length; k++) {
-        loop.push([pts[k][0] * chord + zOff, y, pts[k][1] * chord + dih]);
-      }
+      const x = f * span / 2;
+      const y = yWing + Math.tan(dihedral) * x;
+      const z = zLE + Math.tan(sweep) * x;
+      stations.push({ f: f, chord: chord, x: x, y: y, z: z });
+    }
+
+    const wingLines = [];
+    // ① 展向连接线：把翼型同一索引的点在不同站位连起来（每 3 点取 1，避免过密）
+    const step = Math.max(1, Math.floor(prof.length / 14));
+    for (let k = 0; k < prof.length; k += step) {
+      const line = stations.map(function (s) {
+        return [s.x, s.y + prof[k][1] * s.chord, s.z + prof[k][0] * s.chord];
+      });
+      wingLines.push(line);
+    }
+    // ② 翼根与翼尖的翼型轮廓（闭合），让截面形状可读
+    [stations[0], stations[stations.length - 1]].forEach(function (s) {
+      const loop = prof.map(function (p) {
+        return [s.x, s.y + p[1] * s.chord, s.z + p[0] * s.chord];
+      });
       loop.push(loop[0]);
       wingLines.push(loop);
-    }
-    // 左右两侧
-    const wingLeft = wingLines.map(function (loop) {
-      return loop.map(function (p) { return [-p[0], -p[1], p[2]]; });
     });
-    parts.push({ name: '机翼（右）', kind: 'line', data: wingLines });
-    parts.push({ name: '机翼（左）', kind: 'line', data: wingLeft });
-    // 前后缘连线
-    const leLine = wingLines.map(function (loop) { return loop[0]; });
-    const teLine = wingLines.map(function (loop) { return loop[loop.length - 2]; });
-    parts.push({ name: '前缘', kind: 'line', data: [leLine, leLine.map(function (p) { return [-p[0], -p[1], p[2]]; })] });
-    parts.push({ name: '后缘', kind: 'line', data: [teLine, teLine.map(function (p) { return [-p[0], -p[1], p[2]]; })] });
+    // ③ 前缘 / 后缘线
+    wingLines.push(stations.map(function (s) { return [s.x, s.y, s.z]; }));
+    wingLines.push(stations.map(function (s) { return [s.x, s.y, s.z + s.chord]; }));
 
-    // ---- 机身：长方体线框（按机头→机尾分段，带一点收窄）----
-    const bodyW = Math.max(0.035, root * 0.24);
-    const bodyH = Math.max(0.04, root * 0.30);
-    const noseZ = -fusL * 0.42;   // 机头在 -Z
-    const tailZ = fusL * 0.58;
+    parts.push({ name: '机翼（右）', kind: 'line', group: WING, data: wingLines });
+    // 左翼镜像（X 取反）
+    parts.push({
+      name: '机翼（左）', kind: 'line', group: WING,
+      data: wingLines.map(function (line) {
+        return line.map(function (p) { return [-p[0], p[1], p[2]]; });
+      })
+    });
+
+    /* ---------- 机身：锥形分段长方体 ---------- */
+    const bodyW = Math.max(0.030, root * 0.20);
+    const bodyH = Math.max(0.036, root * 0.26);
     const sect = [
-      { z: noseZ, w: bodyW * 0.35, h: bodyH * 0.35 },
-      { z: noseZ + fusL * 0.12, w: bodyW, h: bodyH },
-      { z: noseZ + fusL * 0.45, w: bodyW, h: bodyH },
-      { z: tailZ - fusL * 0.06, w: bodyW * 0.45, h: bodyH * 0.55 },
-      { z: tailZ, w: bodyW * 0.3, h: bodyH * 0.4 }
+      { z: bodyZ0, w: bodyW * 0.30, h: bodyH * 0.30 },              // 机头
+      { z: bodyZ0 + fusL * 0.10, w: bodyW * 0.85, h: bodyH * 0.80 },
+      { z: bodyZ0 + fusL * 0.30, w: bodyW, h: bodyH },              // 最宽（电机/电池舱）
+      { z: zLE, w: bodyW * 0.98, h: bodyH * 0.98 },                 // 机翼安装处
+      { z: bodyZ1 - fusL * 0.14, w: bodyW * 0.55, h: bodyH * 0.62 },
+      { z: bodyZ1, w: bodyW * 0.28, h: bodyH * 0.34 }               // 尾端
     ];
     const bodyLines = [];
-    // 四条纵向棱线
-    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function (q) {
-      const line = sect.map(function (s) { return [q[0] * s.w / 2, q[1] * s.h / 2, s.z]; });
-      bodyLines.push(line);
+    // 纵向 4 条棱线 + 顶/底中线（让机身有体积感）
+    [[-1, -1], [1, -1], [1, 1], [-1, 1], [0, 1], [0, -1]].forEach(function (q) {
+      bodyLines.push(sect.map(function (s) {
+        return [q[0] * s.w / 2, q[1] * s.h / 2, s.z];
+      }));
     });
-    // 截面矩形
-    sect.forEach(function (s) {
-      const w = s.w / 2, h = s.h / 2;
+    // 截面矩形（只画 4 个关键截面，避免线太多）
+    [0, 2, 3, 5].forEach(function (si) {
+      const s = sect[si], w = s.w / 2, h = s.h / 2;
       bodyLines.push([[-w, -h, s.z], [w, -h, s.z], [w, h, s.z], [-w, h, s.z], [-w, -h, s.z]]);
     });
-    parts.push({ name: '机身', kind: 'line', data: bodyLines });
+    parts.push({ name: '机身', kind: 'line', group: BODY, data: bodyLines });
 
-    // ---- 平尾 ----
-    const hz = cgZ() + lh;      // 平尾在重心后 lh
-    const tailLE = [[0, -tailSpan * 0.5, hz], [0, tailSpan * 0.5, hz]];
-    const tailTE = [[-tailChord, -tailSpan * 0.5, hz + tailChord * 0.0], [-tailChord, tailSpan * 0.5, hz + tailChord * 0.0]];
-    parts.push({
-      name: '平尾', kind: 'line', data: [
-        [tailLE[0], tailLE[1], tailTE[1], tailTE[0], tailLE[0]],
-        [tailLE[0], tailTE[0]], [tailLE[1], tailTE[1]]
-      ]
-    });
+    /* ---------- 平尾 ---------- */
+    const hz = zLE + root * 0.35 + num(t.lh, fusL * 0.55) * 0.92;
+    const tz = Math.min(hz, bodyZ1 - tailChord * 0.35);
+    const tailLines = [];
+    const tailRoot = [0, yWing * 0.6, tz];
+    const tailTipL = [-tailSpan / 2, yWing * 0.6, tz + tailChord * 0.06];
+    const tailTipR = [tailSpan / 2, yWing * 0.6, tz + tailChord * 0.06];
+    const tailTER = [tailSpan / 2, yWing * 0.6, tz + tailChord];
+    const tailTEL = [-tailSpan / 2, yWing * 0.6, tz + tailChord];
+    tailLines.push([tailTipL, tailRoot, tailTipR, tailTER, tailTEL, tailTipL]);
+    tailLines.push([[0, yWing * 0.6, tz], [0, yWing * 0.6, tz + tailChord]]);
+    parts.push({ name: '平尾', kind: 'line', group: TAIL, data: tailLines });
 
-    // ---- 垂尾 ----
-    const finZ = hz;
+    /* ---------- 垂尾 ---------- */
+    const finZ = tz;
     parts.push({
-      name: '垂尾', kind: 'line', data: [[
-        [-finRoot, 0, finZ],
-        [-finRoot * 0.45, finH, finZ + finRoot * 0.35],
-        [0, finH, finZ + finRoot * 0.35],
-        [0, 0, finZ],
-        [-finRoot, 0, finZ]
+      name: '垂尾', kind: 'line', group: TAIL, data: [[
+        [0, bodyH * 0.4, finZ],
+        [0, bodyH * 0.4 + finH, finZ + finRoot * 0.45],
+        [0, bodyH * 0.4 + finH, finZ + finRoot * 0.95],
+        [0, bodyH * 0.4, finZ + finRoot],
+        [0, bodyH * 0.4, finZ]
       ]]
     });
 
-    // ---- 旋翼（旋翼机型）----
+    /* ---------- 旋翼（旋翼机型）---------- */
     if (c.rotary) {
       const rr = c.rotary;
       const n = rr.nrotor || 4;
-      const arm = rr.rotorDia * 0.7071;
-      const discLines = [];
+      const arm = Math.max(0.06, rr.rotorDia * 0.68);
+      const rotorLines = [];
       for (let i = 0; i < n; i++) {
         const a = (Math.PI * 2 * i) / n + Math.PI / 4;
-        const cx = Math.cos(a) * arm, cy = Math.sin(a) * arm;
-        discLines.push(armLine([0, 0, 0], [cx, cy, 0]));
-        discLines.push(circle(cx, cy, rr.rotorDia / 2, 0));
+        const cx = Math.cos(a) * arm, cz = Math.sin(a) * arm;
+        rotorLines.push([[0, 0, 0], [cx, 0, cz]]);
+        rotorLines.push(circle3(cx, 0, cz, Math.max(0.03, rr.rotorDia / 2), 28));
+        rotorLines.push([[cx, 0, cz], [cx, 0.012, cz]]);
       }
-      parts.push({ name: '旋翼与机臂', kind: 'line', data: discLines });
-      parts.push({ name: '机身', kind: 'line', data: [box(arm * 1.1, arm * 1.1, 0.06)] });
+      parts.push({ name: '旋翼与机臂', kind: 'line', group: ROTOR, data: rotorLines });
+      parts.push({ name: '机身', kind: 'line', group: BODY, data: [box3(arm * 1.15, 0.05, arm * 1.15)] });
     }
 
-    function cgZ() { return noseZ + fusL * (num(c.cg && c.cg.cgPct, 0.35)); }
-
-    function armLine(a, b) { return [a, b]; }
-    function circle(cx, cy, r, z) {
+    function circle3(cx, cy, cz, r, nSeg) {
       const out = [];
-      for (let i = 0; i <= 36; i++) {
-        const a = (Math.PI * 2 * i) / 36;
-        out.push([cx + r * Math.cos(a), cy + r * Math.sin(a), z]);
+      for (let i = 0; i <= nSeg; i++) {
+        const a = (Math.PI * 2 * i) / nSeg;
+        out.push([cx + r * Math.cos(a), cy, cz + r * Math.sin(a)]);
       }
       return out;
     }
-    function box(w, d, h) {
-      const x = w / 2, z = d / 2, y = h / 2;
-      return [[-x, -z, -y], [x, -z, -y], [x, z, -y], [-x, z, -y], [-x, -z, -y]];
+    function box3(w, h, d) {
+      const x = w / 2, y = h / 2, z = d / 2;
+      return [[-x, -y, -z], [x, -y, -z], [x, -y, z], [-x, -y, z], [-x, -y, -z]];
     }
     function defaultAirfoil() {
       const out = [];
-      for (let i = 0; i <= 20; i++) {
-        const x = 0.5 * (1 - Math.cos((Math.PI * i) / 20));
-        const yt = 0.6 * (0.2969 * Math.sqrt(x) - 0.126 * x - 0.3516 * x * x + 0.2843 * x * x * x - 0.1015 * x * x * x * x);
-        out.push([x, yt]);
+      const N = 24;
+      const yt = function (x) {
+        return 0.6 * (0.2969 * Math.sqrt(Math.max(0, x)) - 0.126 * x - 0.3516 * x * x + 0.2843 * x * x * x - 0.1015 * x * x * x * x);
+      };
+      for (let i = 0; i <= N; i++) {
+        const x = 0.5 * (1 - Math.cos((Math.PI * i) / N));
+        out.push([x, yt(x)]);
       }
-      for (let i = 20; i >= 0; i--) {
-        const x = 0.5 * (1 - Math.cos((Math.PI * i) / 20));
-        const yt = 0.6 * (0.2969 * Math.sqrt(x) - 0.126 * x - 0.3516 * x * x + 0.2843 * x * x * x - 0.1015 * x * x * x * x);
-        out.push([x, -yt]);
+      for (let i = N; i >= 1; i--) {
+        const x = 0.5 * (1 - Math.cos((Math.PI * i) / N));
+        out.push([x, -yt(x)]);
       }
       return out;
     }
 
     return {
       parts: parts,
-      bounds: { span: span, length: fusL, height: Math.max(bodyH, finH) },
-      unit: 'm'
+      bounds: {
+        span: span,
+        length: fusL,
+        height: Math.max(bodyH, finH) + Math.abs(yWing),
+        x: span / 2, yTop: Math.max(bodyH / 2, finH), zFront: noseZ, zBack: bodyZ1
+      },
+      unit: 'm',
+      convention: { X: '展向', Y: '向上', Z: '前后(机头 -Z)' }
     };
   }
 
@@ -241,21 +283,27 @@
     function setGeometry(geo) {
       clearParts();
       state.geometry = geo;
-      if (!geo) { refresh(); return; }
-      const mat = new THREE.LineBasicMaterial({ color: 0x7fb6ff, transparent: true, opacity: 0.92 });
-      const matAccent = new THREE.LineBasicMaterial({ color: 0x39d98a, transparent: true, opacity: 0.9 });
-      geo.parts.forEach(function (part) {
-        const m = (part.name.indexOf('机翼') >= 0) ? mat : matAccent;
-        (part.data || []).forEach(function (line) {
-          if (!line || line.length < 2) return;
-          const pts = line.map(function (p) { return new THREE.Vector3(p[0], p[2], p[1]); }); // (x, y_up→z? ) 见下
-          const g = new THREE.BufferGeometry().setFromPoints(pts);
-          const seg = new THREE.Line(g, m);
-          rootGroup.add(seg);
+      if (!geo) { refresh(); return { lines: 0 }; }
+      // 分组配色：机翼青、机身蓝、尾翼绿、旋翼橙
+      const COLORS = {
+        wing: 0x4cc9f0, body: 0x8fb3e0, tail: 0x39d98a, rotor: 0xffb020
+      };
+      const mats = {};
+      Object.keys(COLORS).forEach(function (k) {
+        mats[k] = new THREE.LineBasicMaterial({
+          color: COLORS[k], transparent: true, opacity: k === 'wing' ? 0.9 : 0.78
         });
       });
-      // 说明：几何数据里约定 [x=前后(机身轴), y=展向, z=上下]，
-      // Three.js 用 Y 轴向上，所以映射为 (x_three = z_geo? ) —— 统一到：X 展向、Y 向上、Z 前后
+      geo.parts.forEach(function (part) {
+        const mat = mats[part.group] || mats.body;
+        (part.data || []).forEach(function (line) {
+          if (!line || line.length < 2) return;
+          // 几何已按 Three.js 右手系构建（X 展向 / Y 向上 / Z 前后），无需换算
+          const pts = line.map(function (p) { return new THREE.Vector3(p[0], p[1], p[2]); });
+          const g = new THREE.BufferGeometry().setFromPoints(pts);
+          rootGroup.add(new THREE.Line(g, mat));
+        });
+      });
       frameCamera();
       refresh();
       return { lines: rootGroup.children.length };
@@ -263,20 +311,22 @@
 
     function frameCamera() {
       const b = (state.geometry && state.geometry.bounds) || { span: 1.2, length: 1, height: 0.3 };
-      const ext = Math.max(b.span, b.length, b.height) * 0.62;
-      state.dist = ext * 1.35;
+      // 依据三轴尺寸确定取景尺度，让模型占画面 60~70%，避免过小或溢出
+      const span = b.span || 1.2, len = b.length || 1, hgt = b.height || 0.3;
+      state.dist = Math.max(span, len) * 0.62 + hgt * 0.4;
+      state.center = { x: 0, y: b.yTop ? Math.min(0.04, hgt * 0.2) : 0, z: ((b.zFront || -0.5) + (b.zBack || 0.5)) / 2 };
+      rootGroup.position.set(0, 0, 0);
       Object.keys(state.ortho).forEach(function (k) {
-        const cam = state.ortho[k];
-        setOrthoExtent(cam, ext);
+        setOrthoExtent(state.ortho[k], state.dist);
       });
     }
 
     function setOrthoExtent(cam, ext) {
       const el = renderer.domElement;
       const aspect = (el.clientWidth || 1) / (el.clientHeight || 1);
-      const h = ext * 1.15, w = h * aspect;
+      const h = ext * 0.62, w = h * aspect;
       cam.left = -w; cam.right = w; cam.top = h; cam.bottom = -h;
-      cam.near = -100; cam.far = 100;
+      cam.near = -50; cam.far = 50;
       cam.updateProjectionMatrix();
     }
 
