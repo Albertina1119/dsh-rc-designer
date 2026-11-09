@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '1.4.0';
+  const VERSION = '1.5.0';
   const SCHEMA = 'dsh-project@1';
   const STORE_KEY = 'dsh.rcDesigner.v1';
 
@@ -532,6 +532,15 @@
    * 8. Changelog
    * =================================================================== */
   const CHANGELOG = [
+    {
+      version: '1.5.0', date: '2026-10-15',
+      highlights: [
+        '结果页改为 7 个标签页分屏：方案对比 / 完整参数 / 三视图 3D / 约束校验 / 器件 BOM / 评分明细 / 命名与导出',
+        '每次只显示一块内容并铺满整宽，彻底消除左右空栏与超长滚动',
+        '标签带角标（3 套 / 校验结论 / BOM 匹配数），生成方案后自动回到「方案对比」',
+        'BOM 面板两列排布、参数表固定列宽、评分多列并排'
+      ]
+    },
     {
       version: '1.4.0', date: '2026-10-15',
       highlights: [
