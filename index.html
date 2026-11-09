@@ -598,11 +598,22 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
 #cardAnchor #btnPlan{display:none}
 #cardAnchor .btnrow{display:none}
 
-/* 结果页 */
+/* 结果页：标签页分屏（一次只显示一块，铺满宽度，杜绝长条与留白） */
 #view-result{display:none}
-#view-result.on{display:block;padding:18px 20px 70px;max-width:1560px;margin:0 auto}
-.resgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,420px);gap:16px;align-items:start}
-.resmain,.resside{display:flex;flex-direction:column;gap:14px;min-width:0}
+#view-result.on{display:block;padding:18px 22px 64px;max-width:1620px;margin:0 auto}
+#view-result .tabbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;
+  padding-bottom:12px;border-bottom:1px solid var(--line)}
+#view-result .tab{appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.03);
+  color:var(--tx2);font-family:inherit;font-size:12px;padding:8px 15px;border-radius:8px;
+  cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+#view-result .tab:hover{background:rgba(255,255,255,.07);color:var(--tx)}
+#view-result .tab.on{background:rgba(76,201,240,.16);border-color:var(--acc);color:var(--acc);font-weight:600}
+#view-result .tab .cnt{font-size:10px;padding:1px 6px;border-radius:10px;
+  background:rgba(255,255,255,.10);color:var(--tx3);font-weight:500}
+#view-result .tab.on .cnt{background:rgba(76,201,240,.24);color:var(--acc)}
+#view-result .tab .cnt:empty{display:none}
+#view-result .tpanel{display:none}
+#view-result .tpanel.on{display:flex;flex-direction:column;gap:16px}
 /* 三套方案横排 */
 .plans3:empty{display:none}
 #cardPlans{margin:0}
@@ -620,7 +631,20 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
 /* 卡片在结果页更宽松一些 */
 #view-result .card{margin:0}
 #view-result .card .body{padding:13px 15px}
-#view-result .vdstage{height:300px}
+#view-result .vdstage{height:430px}
+/* 面板内的卡片铺满宽度 */
+#view-result .tpanel > div{min-width:0}
+#view-result .tpanel > div:empty{display:none}
+/* 每个面板内部铺满宽度，避免单列长条 */
+#panel-bom #bomBody{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:12px;align-items:start}
+#panel-bom .bomgroup{margin:0}
+#panel-params table.params{table-layout:fixed;width:100%}
+#panel-params table.params th:nth-child(1),#panel-params table.params td:nth-child(1){width:26px}
+#panel-params table.params th:nth-child(2),#panel-params table.params td:nth-child(2){width:230px}
+#panel-params table.params th:nth-child(3),#panel-params table.params td:nth-child(3){width:210px}
+#panel-score #scoreBars{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:9px 26px}
+#panel-compare #cmpWrap{max-height:none!important}
+#panel-check .checks{width:100%}
 
 @media (max-width:1180px){
   .resgrid{grid-template-columns:1fr}
@@ -632,7 +656,12 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
   .stagebar{padding:11px 12px}
   .stagebar .btnrow{width:100%}
   .stagebar .btnrow .btn{flex:1}
-  #view-result .vdstage{height:250px}
+  #view-result .vdstage{height:260px}
+  #view-result .tabbar{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:10px}
+  #view-result .tab{flex:0 0 auto;min-height:40px}
+  #panel-bom #bomBody{grid-template-columns:1fr}
+  #panel-params table.params{table-layout:auto}
+  #panel-params table.params th:nth-child(2),#panel-params table.params td:nth-child(2),#panel-params table.params th:nth-child(3),#panel-params table.params td:nth-child(3){width:auto}
 }
 </style>
 </head>
@@ -800,11 +829,41 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
     </div>
   </div>
 
-  <div class="resgrid">
-    <div class="resmain" id="resMain">
-      <div class="plans3" id="resPlans"></div>
-    </div>
-    <div class="resside" id="resSide"></div>
+  <!-- 结果页标签栏：一次只显示一块，每块铺满宽度 -->
+  <div class="tabbar" id="resTabs">
+    <button class="tab on" data-tab="compare">方案对比<span class="cnt" id="tabN1"></span></button>
+    <button class="tab" data-tab="params">完整参数</button>
+    <button class="tab" data-tab="view3d">三视图 3D</button>
+    <button class="tab" data-tab="check">约束校验<span class="cnt" id="tabN2"></span></button>
+    <button class="tab" data-tab="bom">器件 BOM<span class="cnt" id="tabN3"></span></button>
+    <button class="tab" data-tab="score">评分明细</button>
+    <button class="tab" data-tab="export">命名与导出</button>
+  </div>
+
+  <div class="tpanel on" id="panel-compare">
+    <div id="resPlans"></div>
+    <div id="resCmp"></div>
+  </div>
+  <div class="tpanel" id="panel-params">
+    <div id="resParams"></div>
+  </div>
+  <div class="tpanel" id="panel-view3d">
+    <div id="res3d"></div>
+  </div>
+  <div class="tpanel" id="panel-check">
+    <div id="resCheck"></div>
+    <div id="resReason"></div>
+  </div>
+  <div class="tpanel" id="panel-bom">
+    <div id="resBom"></div>
+    <div id="resCompliance"></div>
+  </div>
+  <div class="tpanel" id="panel-score">
+    <div id="resScore"></div>
+  </div>
+  <div class="tpanel" id="panel-export">
+    <div id="resName"></div>
+    <div id="resOut"></div>
   </div>
 
 </div>
@@ -919,7 +978,7 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
 
     <div class="card" id="cardCmp" style="display:none">
       <h2><span class="n">7</span>三套方案对比<span class="r">优选值高亮</span></h2>
-      <div class="body tight"><div style="overflow:auto;max-height:430px" id="cmpWrap"></div></div>
+      <div class="body tight"><div style="overflow:auto" id="cmpWrap"></div></div>
     </div>
 
   </div>
@@ -931,7 +990,7 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
       <h2><span class="n">8</span>完整参数<span class="r" id="paramHint">未生成</span></h2>
       <div class="body tight">
         <div class="chips" id="paramTabs" style="padding:10px 12px 0"></div>
-        <div style="max-height:600px;overflow:auto">
+        <div style="max-height:calc(100vh - 340px);min-height:320px;overflow:auto">
           <table class="params" id="paramTable">
             <thead><tr><th style="width:24px"></th><th>参数</th><th>取值</th><th>说明</th></tr></thead>
             <tbody id="paramBody"><tr><td colspan="4" class="empty">尚未生成方案</td></tr></tbody>
@@ -1563,7 +1622,7 @@ function doPlan() {
     .forEach(id => { $(id).style.display = ''; });
   $('exportMsg').textContent = '';
   // 参数齐了就翻到结果页（三套方案 + 3D 图并排）
-  try { showStage('result'); } catch (e) { console.warn(e); }
+  try { showTab('compare'); showStage('result'); } catch (e) { console.warn(e); }
   toast('已生成 ' + res.top3.length + ' 套方案，向右可查看 3D 预览与器件清单', 'ok');
 }
 
@@ -2919,11 +2978,18 @@ function assembleStages() {
   ['cardType', 'cardAnchor', 'cardAf', 'cardDim'].forEach(function (id) {
     move(id, 'inLeft');
   });
-  /* 结果页：左主栏 = 三套方案（并排）+ 完整参数；右栏 = 3D 图 + 校验 + BOM 等 */
-  move('cardPlans', 'resMain');
-  move('cardParams', 'resMain');
-  ['card3d', 'cardCheck', 'cardScore', 'cardCmp', 'cardBom', 'cardCompliance', 'cardReason', 'cardName', 'cardOut']
-    .forEach(function (id) { move(id, 'resSide'); });
+  /* 结果页：按标签页分配，每页只放相关卡片，铺满宽度 */
+  move('cardPlans', 'resPlans');      // 方案对比
+  move('cardCmp', 'resCmp');
+  move('cardParams', 'resParams');    // 完整参数
+  move('card3d', 'res3d');            // 三视图
+  move('cardCheck', 'resCheck');      // 约束校验
+  move('cardReason', 'resReason');
+  move('cardBom', 'resBom');          // 器件 BOM
+  move('cardCompliance', 'resCompliance');
+  move('cardScore', 'resScore');      // 评分明细
+  move('cardName', 'resName');        // 命名与导出
+  move('cardOut', 'resOut');
 
   /* 输入页右侧说明卡（容器已在静态 HTML 中，只填内容） */
   const side = $('inSide');
@@ -2978,6 +3044,47 @@ function showStage(which) {
   try { if (window.scrollTo) window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
 }
 
+/* 结果页标签切换：一次只显示一块，避免长条滚动与空白栏 */
+let TAB = 'compare';
+function showTab(key) {
+  TAB = key || 'compare';
+  const bar = $('resTabs');
+  if (!bar) return;
+  bar.querySelectorAll('.tab').forEach(function (b) {
+    b.classList.toggle('on', b.dataset.tab === TAB);
+  });
+  document.querySelectorAll('#view-result .tpanel').forEach(function (p) {
+    p.classList.toggle('on', p.id === 'panel-' + TAB);
+  });
+  // 3D 面板可见后才量尺寸
+  if (TAB === 'view3d') {
+    setTimeout(function () {
+      try { vdInit(); } catch (e) {}
+      if (VD && VD.refresh) VD.refresh();
+    }, 60);
+  }
+  updateTabCounts();
+}
+function updateTabCounts() {
+  if (!S.result) return;
+  const t = S.result.top3[S.selected];
+  if ($('tabN1')) $('tabN1').textContent = '3 套';
+  const cs = (t.plan.constraints || []);
+  const nW = cs.filter(function (c) { return c.level === 'warn'; }).length;
+  const nE = cs.filter(function (c) { return c.level === 'error'; }).length;
+  if ($('tabN2')) $('tabN2').textContent = nE ? (nE + ' 错') : (nW ? (nW + ' 警') : '通过');
+  if ($('tabN3')) {
+    const n = (CUR_BOM && CUR_BOM.items) ? CUR_BOM.items.filter(function (i) { return i.best; }).length : 0;
+    const tot = (CUR_BOM && CUR_BOM.items) ? CUR_BOM.items.length : 0;
+    $('tabN3').textContent = tot ? (n + '/' + tot) : '';
+  }
+}
+if ($('resTabs')) {
+  $('resTabs').querySelectorAll('.tab').forEach(function (b) {
+    b.onclick = function () { showTab(b.dataset.tab); };
+  });
+}
+
 /* ---------- 按钮接线 ---------- */
 /* 两段式布局接线 */
 if ($('btnBack')) $('btnBack').onclick = function () { showStage('input'); };
@@ -3028,6 +3135,7 @@ renderPlans = function (res) {
   _renderPlansOrig(res);
   try { renderCompliance(); } catch (e) {}
   try { renderBom(); } catch (e) { console.warn(e); }
+  try { updateTabCounts(); } catch (e) {}
   try { updateStepBar(); } catch (e) {}
   try { vdInit(); } catch (e) { console.warn('3D 预览初始化失败', e); }
 };
