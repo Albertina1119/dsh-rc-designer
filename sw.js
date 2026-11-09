@@ -11,7 +11,7 @@
  * 没有 Vite 构建管线，因此用等价的「手写 SW + 页面更新提示」实现同样行为：
  * 更新不自动接管，由用户点「立即刷新」或「稍后」决定。
  */
-const VERSION = 'v1.3.0';
+const VERSION = 'v1.4.0';
 const CACHE = 'dsh-rc-' + VERSION;
 
 const PRECACHE = [
