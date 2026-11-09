@@ -73,39 +73,245 @@
   }
 
   /**
-   * 翼肋 DXF：由翼型轮廓点生成
+   * 翼肋 DXF：由翼型轮廓点生成，可选加主梁孔 / 主梁槽 / 定位孔
    * @param {object} contour AeroLib.contour() 的返回值（已按弦长缩放）
-   * @param {object} opt { chordMM, airfoil, sparDiaMM, sparPosPct, label }
+   * @param {object} opt {
+   *   chordMM, airfoil,
+   *   sparDiaMM,        // 圆孔直径（mm），与 sparSlot 二选一或都不传
+   *   sparPosPct,       // 孔/槽中心在弦向的位置（0~1，默认 0.30）
+   *   sparSlot,         // { w, h } 矩形梁槽（mm），传了就用矩形代替圆孔
+   *   jig               // true = 加两个定位孔（⌀3 mm，位于 15% / 85% 弦长）
+   * }
    */
   function ribDxf(contour, opt) {
     const o = opt || {};
     if (!contour || !contour.points || !contour.points.length) {
       return { ok: false, error: '缺少翼型坐标点' };
     }
+    const chord = isFinite(o.chordMM) ? o.chordMM : (contour.chord || 100);
     const pts = contour.points.map(function (p) { return [p[0], p[1]]; });
-    let dxf = polylineDxf(pts, { layer: 'RIB_OUTLINE' });
-    // 主梁孔：单独一条闭合圆（用多边形近似），作为第二个 POLYLINE
-    if (isFinite(o.sparDiaMM) && o.sparDiaMM > 0) {
+    const entities = [];
+    entities.push(polyBody(pts, 'RIB_OUTLINE', 7));
+
+    const posPct = isFinite(o.sparPosPct) ? o.sparPosPct : 0.30;
+    const cx = chord * posPct;
+    const features = [];
+
+    // 主梁槽（矩形）优先，其次圆孔
+    if (o.sparSlot && o.sparSlot.w > 0 && o.sparSlot.h > 0) {
+      const w = o.sparSlot.w / 2, h = o.sparSlot.h / 2;
+      entities.push(polyBody([[cx - w, -h], [cx + w, -h], [cx + w, h], [cx - w, h]], 'SPAR_SLOT', 1));
+      features.push('梁槽 ' + o.sparSlot.w + '×' + o.sparSlot.h + ' mm @ ' + Math.round(posPct * 100) + '% 弦长');
+    } else if (isFinite(o.sparDiaMM) && o.sparDiaMM > 0) {
       const r = o.sparDiaMM / 2;
-      const cx = (o.chordMM || contour.chord || 100) * (isFinite(o.sparPosPct) ? o.sparPosPct / 100 : 0.30);
-      const cy = 0;
-      const hole = [];
-      for (let i = 0; i < 32; i++) {
-        const a = (Math.PI * 2 * i) / 32;
-        hole.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
-      }
-      const holeDxf = polylineDxf(hole, { layer: 'SPAR_HOLE', color: 1 });
-      // 把孔的多段线插到 ENTITIES 段内
-      dxf = dxf.replace(dxfPair(0, 'ENDSEC') + dxfPair(0, 'EOF'),
-        holeDxf.replace(/^[\s\S]*?ENTITIES\n/, '').replace(dxfPair(0, 'ENDSEC') + dxfPair(0, 'EOF'), '') +
-        dxfPair(0, 'ENDSEC') + dxfPair(0, 'EOF'));
+      entities.push(polyBody(circlePts(cx, 0, r, 32), 'SPAR_HOLE', 1));
+      features.push('主梁孔 ⌀' + o.sparDiaMM + ' mm @ ' + Math.round(posPct * 100) + '% 弦长');
     }
+
+    // 定位孔：两个 ⌀3 mm，位于 15% / 85% 弦长，沿弦线下方 8% 弦长处
+    if (o.jig) {
+      const jr = 1.5;
+      const jy = -Math.max(3, chord * 0.08);
+      [0.15, 0.85].forEach(function (f, i) {
+        entities.push(polyBody(circlePts(chord * f, jy, jr, 16), 'JIG_HOLE', 3));
+      });
+      features.push('定位孔 2 × ⌀3 mm @ 15% / 85% 弦长');
+    }
+
+    const dxf = assembleDxf(entities);
     return {
       ok: true, dxf: dxf,
       pointCount: pts.length,
-      chordMM: o.chordMM || contour.chord || null,
+      chordMM: chord,
+      features: features,
       layer: 'RIB_OUTLINE',
-      filename: (o.airfoil || 'airfoil').replace(/\s+/g, '_') + '_rib_' + Math.round(o.chordMM || contour.chord || 0) + 'mm.dxf'
+      filename: (o.airfoil || 'airfoil').replace(/\s+/g, '_') + '_rib_' + Math.round(chord) + 'mm.dxf'
+    };
+  }
+
+  /** 圆点集 */
+  function circlePts(cx, cy, r, n) {
+    const out = [];
+    const N = n || 24;
+    for (let i = 0; i < N; i++) {
+      const a = (Math.PI * 2 * i) / N;
+      out.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+    return out;
+  }
+
+  /** 单条闭合多段线的 DXF 片段（不含 SECTION 包装） */
+  function polyBody(pts, layer, color) {
+    const list = (pts || []).filter(function (p) { return isFinite(p[0]) && isFinite(p[1]); });
+    let s = '';
+    s += dxfPair(0, 'POLYLINE') + dxfPair(8, layer || '0') + dxfPair(62, color == null ? 7 : color);
+    s += dxfPair(66, 1) + dxfPair(70, 1);
+    s += dxfPair(10, 0) + dxfPair(20, 0) + dxfPair(30, 0);
+    list.forEach(function (p) {
+      s += dxfPair(0, 'VERTEX') + dxfPair(8, layer || '0');
+      s += dxfPair(10, +p[0].toFixed(4)) + dxfPair(20, +p[1].toFixed(4)) + dxfPair(30, 0);
+    });
+    s += dxfPair(0, 'SEQEND') + dxfPair(8, layer || '0');
+    return s;
+  }
+
+  /** 用若干实体片段组装完整 DXF（R12 / mm / 含图层表） */
+  function assembleDxf(bodies) {
+    const layers = {};
+    bodies.forEach(function (b) {
+      const m = /\n8\n([^\n]+)\n/.exec(b);
+      const c = /\n62\n(\d+)\n/.exec(b);
+      if (m) layers[m[1]] = c ? Number(c[1]) : 7;
+    });
+    let maxX = 0, maxY = 0;
+    bodies.forEach(function (b) {
+      const re = /\n10\n(-?[\d.]+)\n20\n(-?[\d.]+)\n/g;
+      let m;
+      while ((m = re.exec(b))) {
+        const x = parseFloat(m[1]), y = parseFloat(m[2]);
+        if (isFinite(x) && Math.abs(x) > maxX) maxX = Math.abs(x);
+        if (isFinite(y) && Math.abs(y) > maxY) maxY = Math.abs(y);
+      }
+    });
+
+    let s = '';
+    s += dxfPair(0, 'SECTION') + dxfPair(2, 'HEADER');
+    s += dxfPair(9, '$ACADVER') + dxfPair(1, 'AC1009');
+    s += dxfPair(9, '$INSUNITS') + dxfPair(70, 4);
+    s += dxfPair(9, '$MEASUREMENT') + dxfPair(70, 1);
+    s += dxfPair(9, '$EXTMIN') + dxfPair(10, 0) + dxfPair(20, -maxY.toFixed(3)) + dxfPair(30, 0);
+    s += dxfPair(9, '$EXTMAX') + dxfPair(10, maxX.toFixed(3)) + dxfPair(20, maxY.toFixed(3)) + dxfPair(30, 0);
+    s += dxfPair(0, 'ENDSEC');
+
+    s += dxfPair(0, 'SECTION') + dxfPair(2, 'TABLES');
+    s += dxfPair(0, 'TABLE') + dxfPair(2, 'LAYER') + dxfPair(70, Object.keys(layers).length);
+    Object.keys(layers).forEach(function (name) {
+      s += dxfPair(0, 'LAYER') + dxfPair(2, name) + dxfPair(70, 0) +
+        dxfPair(62, layers[name]) + dxfPair(6, 'CONTINUOUS');
+    });
+    s += dxfPair(0, 'ENDTAB') + dxfPair(0, 'ENDSEC');
+
+    s += dxfPair(0, 'SECTION') + dxfPair(2, 'ENTITIES') + bodies.join('');
+    s += dxfPair(0, 'ENDSEC') + dxfPair(0, 'EOF');
+    return s;
+  }
+
+  /* =====================================================================
+   * 2. 批量打包 ZIP（STORED 无压缩，与 xlsx-export 同思路，零依赖）
+   * =================================================================== */
+  const CRC_TABLE = (function () {
+    const t = new Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+
+  function crc32(bytes) {
+    let c = 0xffffffff;
+    for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  }
+
+  function utf8Bytes(str) {
+    const s = String(str);
+    const out = [];
+    for (let i = 0; i < s.length; i++) {
+      let c = s.charCodeAt(i);
+      if (c < 0x80) out.push(c);
+      else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+      else if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length) {
+        const c2 = s.charCodeAt(i + 1);
+        const cp = 0x10000 + ((c - 0xd800) << 10) + (c2 - 0xdc00);
+        out.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 63), 0x80 | ((cp >> 6) & 63), 0x80 | (cp & 63));
+        i++;
+      } else out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    }
+    return out;
+  }
+
+  function le16(v) { return [v & 0xff, (v >> 8) & 0xff]; }
+  function le32(v) { return [v & 0xff, (v >>> 8) & 0xff, (v >>> 16) & 0xff, (v >>> 24) & 0xff]; }
+
+  /**
+   * 打包成 ZIP（STORED，无压缩）
+   * @param {Array<{name:string, content:string}>} files
+   * @returns {Uint8Array}
+   */
+  function zipStore(files) {
+    const enc = [];
+    const central = [];
+    let offset = 0;
+    (files || []).forEach(function (f) {
+      const nameBytes = utf8Bytes(f.name);
+      const data = utf8Bytes(f.content);
+      const crc = crc32(data);
+      const local = []
+        .concat(le32(0x04034b50), le16(20), le16(0x0800), le16(0), le16(0), le16(0))
+        .concat(le32(crc), le32(data.length), le32(data.length))
+        .concat(le16(nameBytes.length), le16(0))
+        .concat(nameBytes)
+        .concat(data);
+      enc.push(local);
+      central.push([]
+        .concat(le32(0x02014b50), le16(20), le16(20), le16(0x0800), le16(0), le16(0), le16(0))
+        .concat(le32(crc), le32(data.length), le32(data.length))
+        .concat(le16(nameBytes.length), le16(0), le16(0), le16(0), le16(0), le32(0))
+        .concat(le32(offset))
+        .concat(nameBytes));
+      offset += local.length;
+    });
+    const cd = central.reduce(function (a, b) { return a.concat(b); }, []);
+    const end = []
+      .concat(le32(0x06054b50), le16(0), le16(0))
+      .concat(le16(files.length), le16(files.length))
+      .concat(le32(cd.length), le32(offset), le16(0));
+    const all = enc.reduce(function (a, b) { return a.concat(b); }, []).concat(cd, end);
+    return typeof Uint8Array !== 'undefined' ? new Uint8Array(all) : all;
+  }
+
+  /**
+   * 批量导出翼肋：一次生成多个弦长/站位的 DXF 并打包
+   * @param {Array<{chordMM:number, contour:object, airfoil:string}>} list
+   * @param {object} opt 同 ribDxf 的 opt（chordMM 会被逐项覆盖）
+   */
+  function ribBatch(list, opt) {
+    const o = opt || {};
+    const files = [];
+    const summary = [];
+    (list || []).forEach(function (item, i) {
+      const r = ribDxf(item.contour, Object.assign({}, o, {
+        chordMM: item.chordMM, airfoil: item.airfoil || o.airfoil
+      }));
+      if (!r.ok) { summary.push({ index: i + 1, ok: false, error: r.error }); return; }
+      files.push({ name: r.filename, content: r.dxf });
+      summary.push({
+        index: i + 1, ok: true, name: r.filename,
+        chordMM: r.chordMM, points: r.pointCount, features: r.features
+      });
+    });
+    // 附带一份说明清单
+    const manifest = [
+      '翼肋批量导出清单',
+      '生成时间：' + new Date().toLocaleString('zh-CN'),
+      '单位：毫米（DXF 内 $INSUNITS=4）',
+      '图层：RIB_OUTLINE=翼型轮廓，SPAR_HOLE/SPAR_SLOT=主梁孔/槽，JIG_HOLE=定位孔',
+      '',
+      '序号\t文件名\t弦长(mm)\t轮廓点数\t特征'
+    ].concat(summary.filter(function (s) { return s.ok; }).map(function (s) {
+      return s.index + '\t' + s.name + '\t' + s.chordMM + '\t' + s.points + '\t' + (s.features || []).join('；');
+    })).join('\n');
+    files.push({ name: '翼肋导出清单.txt', content: manifest });
+
+    return {
+      ok: files.length > 1,
+      count: summary.filter(function (s) { return s.ok; }).length,
+      files: files,
+      summary: summary,
+      zip: zipStore(files),
+      filename: (o.airfoil || 'airfoil').replace(/\s+/g, '_') + '_ribs_' + summary.filter(function (s) { return s.ok; }).length + '件.zip'
     };
   }
 
@@ -333,6 +539,7 @@
 
   return {
     polylineDxf: polylineDxf, ribDxf: ribDxf, validateDxf: validateDxf,
+    ribBatch: ribBatch, zipStore: zipStore, crc32: crc32,
     fuselageSvg: fuselageSvg, validateSvg: validateSvg, geoFromCore: geoFromCore
   };
 });
