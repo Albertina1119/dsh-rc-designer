@@ -254,7 +254,9 @@ input:disabled{opacity:.4;cursor:not-allowed}
 .plan{
   border:1px solid var(--line);border-radius:11px;margin-bottom:10px;overflow:hidden;cursor:pointer;transition:.15s;
   background:rgba(255,255,255,.015);
+  display:flex;flex-direction:column;
 }
+.plan .bd{display:flex;flex-direction:column;flex:1}
 .plan:hover{border-color:#3f5c95}
 .plan.on{border-color:var(--acc);box-shadow:0 0 0 1px rgba(76,201,240,.35),0 8px 26px rgba(0,0,0,.32)}
 .plan .hd{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line);
@@ -572,6 +574,66 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
 }
 
 
+
+/* ================= 两段式布局（输入页 / 结果页） ================= */
+
+
+.stagebar{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:14px;
+  flex-wrap:wrap;padding:13px 16px;margin-bottom:14px;border-radius:11px;
+  background:linear-gradient(135deg,rgba(76,201,240,.10),rgba(76,201,240,.03));
+  border:1px solid rgba(76,201,240,.28)}
+.stagebar .sb-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-width:0}
+.stagebar .sb-left b{font-size:14px;color:var(--tx);letter-spacing:.3px}
+.stagebar .sb-step{font-size:10.5px;padding:3px 9px;border-radius:20px;white-space:nowrap;
+  background:rgba(76,201,240,.20);color:var(--acc);font-weight:600}
+.stagebar .sb-sub{font-size:11px;color:var(--tx3)}
+.stagebar .btnrow{flex:0 0 auto}
+
+/* 输入页：左输入卡 + 右说明，两栏 */
+#view-design{grid-template-columns:minmax(0,1fr) minmax(300px,340px);gap:16px;align-items:start}
+#view-design #stepBar{grid-column:1/-1}
+#view-design #inLeft{display:flex;flex-direction:column;gap:14px;min-width:0}
+#view-design #inSide{display:flex;flex-direction:column;gap:14px;min-width:0}
+/* 卡片内的旧生成按钮已由顶栏 CTA 取代，隐藏但保留元素（承载禁用状态） */
+#cardAnchor #btnPlan{display:none}
+#cardAnchor .btnrow{display:none}
+
+/* 结果页 */
+#view-result{display:none}
+#view-result.on{display:block;padding:18px 20px 70px;max-width:1560px;margin:0 auto}
+.resgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(360px,420px);gap:16px;align-items:start}
+.resmain,.resside{display:flex;flex-direction:column;gap:14px;min-width:0}
+/* 三套方案横排 */
+.plans3:empty{display:none}
+#cardPlans{margin:0}
+#cardPlans .body{padding:0}
+#cardPlans .modebanner{margin:0 0 10px}
+/* #planList 变成三列网格 → 三套方案并排 */
+#planList{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:13px 15px}
+#planList > .empty{grid-column:1/-1}
+#planList .plan{margin:0;min-width:0}
+#planList .kvmini{grid-template-columns:repeat(2,minmax(0,1fr))}
+#planList .scores.compact{gap:5px;margin-top:10px}
+#planList .scores.compact .scorerow{grid-template-columns:46px 1fr 30px;font-size:10.5px;gap:7px}
+#planList .scores.compact .bar{height:4px}
+#planList .plan .bd{padding:11px 12px}
+/* 卡片在结果页更宽松一些 */
+#view-result .card{margin:0}
+#view-result .card .body{padding:13px 15px}
+#view-result .vdstage{height:300px}
+
+@media (max-width:1180px){
+  .resgrid{grid-template-columns:1fr}
+  .plans3{grid-template-columns:1fr}
+}
+@media (max-width:900px){
+  #view-design{grid-template-columns:1fr !important}
+  #view-result{padding:14px 12px 60px}
+  .stagebar{padding:11px 12px}
+  .stagebar .btnrow{width:100%}
+  .stagebar .btnrow .btn{flex:1}
+  #view-result .vdstage{height:250px}
+}
 </style>
 </head>
 <body>
@@ -722,8 +784,44 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
   </div>
 </div>
 
+<!-- ==================== 视图：设计器 · 第 2 段（结果） ==================== -->
+<div class="page" id="view-result">
+
+  <div class="stagebar">
+    <div class="sb-left">
+      <button class="btn sm ghost" id="btnBack">← 返回修改参数</button>
+      <span class="sb-step">第 2 步 / 共 2 步</span>
+      <b id="resTitle">推荐方案</b>
+      <span class="sb-sub" id="resSub"></span>
+    </div>
+    <div class="btnrow">
+      <button class="btn sm" id="btnSaveTop">保存方案</button>
+      <button class="btn sm pri" id="btnExcelTop">导出 Excel</button>
+    </div>
+  </div>
+
+  <div class="resgrid">
+    <div class="resmain" id="resMain">
+      <div class="plans3" id="resPlans"></div>
+    </div>
+    <div class="resside" id="resSide"></div>
+  </div>
+
+</div>
+
 <!-- ==================== 视图：设计器（原有三栏） ==================== -->
 <div class="wrap" id="view-design">
+
+  <div class="stagebar">
+    <div class="sb-left">
+      <span class="sb-step">第 1 步 / 共 2 步</span>
+      <b>选择机型与数值锚点</b>
+      <span class="sb-sub">至少 2 个锚点、覆盖 2 个维度；机型留空则由引擎自动识别</span>
+    </div>
+    <div class="btnrow">
+      <button class="btn sm pri" id="btnPlan2">生成 3 套推荐方案 →</button>
+    </div>
+  </div>
 
   <div class="stepbar" id="stepBar">
     <div class="st" data-s="1"><span class="dot">1</span>选机型</div><span class="sep"></span>
@@ -734,9 +832,9 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
   </div>
 
   <!-- ============ 左栏 ============ -->
-  <div class="col col-left">
+  <div class="col col-left" id="inLeft">
 
-    <div class="card">
+    <div class="card" id="cardType">
       <h2><span class="n">1</span>机型选择<span class="r">也可留空自动识别</span></h2>
       <div class="body">
         <div class="types" id="typeList"></div>
@@ -746,7 +844,7 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" id="cardAnchor">
       <h2><span class="n">2</span>数值锚点<span class="r" id="anchorCount">0 / 最少 2 个</span></h2>
       <div class="body">
         <div class="src-tabs" id="dimTabs"></div>
@@ -793,10 +891,13 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
 
   </div>
 
-  <!-- ============ 中栏 ============ -->
-  <div class="col col-mid">
+  <!-- ============ 右栏（输入页说明，内容由 JS 填充） ============ -->
+  <div class="col" id="inSide"></div>
 
-    <div class="card">
+  <!-- ============ 中栏 ============ -->
+  <div class="col col-mid" id="colMid">
+
+    <div class="card" id="cardPlans">
       <h2><span class="n">5</span>Top3 推荐方案<span class="r" id="planType"></span></h2>
       <div class="body">
         <div class="modebanner" id="modeBanner" style="display:none"></div>
@@ -824,9 +925,9 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
   </div>
 
   <!-- ============ 右栏 ============ -->
-  <div class="col col-right">
+  <div class="col col-right" id="colRight">
 
-    <div class="card">
+    <div class="card" id="cardParams">
       <h2><span class="n">8</span>完整参数<span class="r" id="paramHint">未生成</span></h2>
       <div class="body tight">
         <div class="chips" id="paramTabs" style="padding:10px 12px 0"></div>
@@ -1283,6 +1384,10 @@ function updateAnchorHint() {
   const okD = dims.size >= 2;
   $('btnPlan').disabled = !(okN && okD);
   $('btnPlan').title = (okN && okD) ? '' : '至少需要 2 个锚点并覆盖 2 个维度';
+  if ($('btnPlan2')) {
+    $('btnPlan2').disabled = !(okN && okD);
+    $('btnPlan2').title = (okN && okD) ? '' : '至少需要 2 个锚点并覆盖 2 个维度';
+  }
   let msg;
   if (n === 0) msg = '请勾选锚点（至少 2 个，数量不设上限）。锚点越贴近性能指标（翼载 / 推重比 / 速度 / 展弦比），推荐越准。';
   else if (!okN) msg = '还需再选 ' + (2 - n) + ' 个锚点（至少 2 个）。';
@@ -1457,7 +1562,9 @@ function doPlan() {
   ['cardDim','cardAf','cardScore','cardCmp','cardCheck','cardReason','cardName','cardOut']
     .forEach(id => { $(id).style.display = ''; });
   $('exportMsg').textContent = '';
-  toast('已生成 ' + res.top3.length + ' 套方案（候选 ' + res.candidatesEvaluated + ' 套，可行 ' + res.feasibleCount + ' 套）', 'ok');
+  // 参数齐了就翻到结果页（三套方案 + 3D 图并排）
+  try { showStage('result'); } catch (e) { console.warn(e); }
+  toast('已生成 ' + res.top3.length + ' 套方案，向右可查看 3D 预览与器件清单', 'ok');
 }
 
 /* ---------- 维度识别 ---------- */
@@ -1512,37 +1619,34 @@ function renderPlans(res) {
     const p = t.plan, c = p.core;
     const d = document.createElement('div');
     d.className = 'plan' + (i === S.selected ? ' on' : '');
+    // 横排三卡：只留最能区分方案的 8 项，其余在「完整参数」里看
     const kvm = [
       ['起飞重量', fmt(c.mass, 2), 'kg'],
-      ['翼面积', fmt(c.area, 3), 'm²'],
-      ['翼展', fmt(c.span, 2), 'm'],
-      ['机身长度', fmt(c.fuselageLength, 2), 'm'],
-      ['展弦比', fmt(c.ar, 2), ''],
-      ['平均弦长', fmt(c.meanChord * 1000, 0), 'mm'],
       ['翼载', fmt(c.wlGdm2, 0), 'g/dm²'],
-      c.rotary ? ['桨盘载荷', fmt(c.rotary.diskLoading, 0), 'N/m²'] : ['失速速度', fmt(c.vStall, 1), 'm/s'],
-      c.rotary ? ['续航', fmt(c.rotary.enduranceMin, 0), 'min'] : ['最大速度', fmt(c.perf.vMaxCalc, 1), 'm/s'],
+      ['翼展', fmt(c.span, 2), 'm'],
+      ['平均弦长', fmt(c.meanChord * 1000, 0), 'mm'],
+      ['机身长度', fmt(c.fuselageLength, 2), 'm'],
       ['翼型', (c.airfoil && c.airfoil.designation) || (c.rotary ? c.rotary.nrotor + ' 旋翼' : '—'), '']
     ];
     d.innerHTML =
       '<div class="hd"><span class="t">' + t.label + '</span><span class="tag">' + t.tag + '</span>' +
         '<span class="sc">' + p.score.total + '</span></div>' +
       '<div class="bd">' +
-        '<div class="hint" style="margin-bottom:9px">' + t.objectiveReason + '</div>' +
+        '<div class="hint" style="margin-bottom:10px;line-height:1.75">' + t.objectiveReason + '</div>' +
         '<div class="kvmini">' + kvm.map(x =>
           '<div><div class="k">' + x[0] + '</div><div class="v">' + x[1] +
           (x[2] ? '<small>' + x[2] + '</small>' : '') + '</div></div>').join('') + '</div>' +
-        '<div class="scores">' + p.score.dimensions.map(dim =>
+        '<div class="scores compact">' + p.score.dimensions.map(dim =>
           '<div class="scorerow"><span class="nm">' + dim.name + '</span>' +
           '<span class="bar"><i style="width:' + dim.score + '%;background:' +
             (dim.score >= 75 ? 'linear-gradient(90deg,#39d98a,#4cc9f0)' :
              dim.score >= 50 ? 'linear-gradient(90deg,#f9c74f,#f8961e)' : 'linear-gradient(90deg,#ff5c72,#f8961e)') +
           '"></i></span><span class="vl">' + dim.score + '</span></div>').join('') + '</div>' +
-        (t.warnings.length ? '<div class="warnlist">' + t.warnings.map(w =>
-          '<div class="warnitem">' + w + '</div>').join('') + '</div>' : '') +
-        '<div class="btnrow" style="margin-top:11px">' +
-          '<button class="btn sm ' + (i === S.selected ? 'ok' : '') + '" data-pick="' + i + '">' +
-          (i === S.selected ? '✓ 已选为当前方案' : '采用此方案') + '</button>' +
+        (t.warnings.length ? '<div class="warnlist"><div class="warnitem">' +
+          t.warnings.length + ' 项提示：' + esc(t.warnings[0]) + '</div></div>' : '') +
+        '<div class="btnrow" style="margin-top:auto;padding-top:11px">' +
+          '<button class="btn sm ' + (i === S.selected ? 'ok' : '') + '" data-pick="' + i + '" style="width:100%">' +
+          (i === S.selected ? '✓ 当前方案' : '采用此方案') + '</button>' +
         '</div>' +
       '</div>';
     d.querySelector('[data-pick]').onclick = (e) => {
@@ -2358,11 +2462,11 @@ let SAVE_SEQ = 0;
 let CUR_PROJECT = null;      // 当前正在编辑的项目 id
 
 /* ---------- 视图切换 ---------- */
-const VIEWS = ['design', 'projects', 'cases', 'help', 'about'];
+const VIEWS = ['design', 'result', 'projects', 'cases', 'help', 'about'];
 function showView(v) {
   VIEWS.forEach(k => {
     const el = $('view-' + k);
-    if (el) el.className = (k === 'design' ? 'wrap' : 'page') + (k === v ? ' on' : '');
+    if (el) el.className = (k === 'design' || k === 'result' ? 'wrap' : 'page') + (k === v ? ' on' : '');
   });
   document.querySelectorAll('#mainNav a').forEach(a => {
     a.classList.toggle('on', a.dataset.view === v);
@@ -2795,7 +2899,100 @@ function endTour() {
   try { localStorage.setItem('dsh.tourDone', '1'); } catch (e) {}
 }
 
+/* =====================================================================
+ * 两段式布局：把同一套卡片在两个阶段之间搬运
+ *   第 1 段（输入）：机型 / 锚点 / 翼型 / 维度
+ *   第 2 段（结果）：方案 ×3 / 三视图 / 完整参数 / 校验 / 评分 / 对比 / BOM / 合规 / 导出
+ * 卡片元素本身不重建，只换父节点，因此已绑定的事件与内部状态全部保留。
+ * =================================================================== */
+let STAGE = 'input';
+function assembleStages() {
+  const move = function (id, parentId, beforeEl) {
+    const el = $(id), p = $(parentId);
+    if (!el || !p) return false;
+    if (beforeEl && beforeEl.parentNode === p) p.insertBefore(el, beforeEl);
+    else p.appendChild(el);
+    return true;
+  };
+
+  /* 输入页：左栏 */
+  ['cardType', 'cardAnchor', 'cardAf', 'cardDim'].forEach(function (id) {
+    move(id, 'inLeft');
+  });
+  /* 结果页：左主栏 = 三套方案（并排）+ 完整参数；右栏 = 3D 图 + 校验 + BOM 等 */
+  move('cardPlans', 'resMain');
+  move('cardParams', 'resMain');
+  ['card3d', 'cardCheck', 'cardScore', 'cardCmp', 'cardBom', 'cardCompliance', 'cardReason', 'cardName', 'cardOut']
+    .forEach(function (id) { move(id, 'resSide'); });
+
+  /* 输入页右侧说明卡（容器已在静态 HTML 中，只填内容） */
+  const side = $('inSide');
+  if (side && !side.dataset.filled) {
+    side.dataset.filled = '1';
+    side.innerHTML =
+      '<div class="card" id="cardGuide">' +
+      '<h2><span class="n">i</span>怎么给锚点</h2>' +
+      '<div class="body">' +
+      '<div class="hint" style="margin-bottom:10px">锚点 = 你指定、引擎必须采纳的输入。给 2 个就能算，给 4~6 个最准。</div>' +
+      '<div class="guideline"><b>推荐组合</b><br>翼载 + 推重比 → 先定性能走向<br>再加翼展 / 目标速度 → 收敛尺寸</div>' +
+      '<div class="guideline"><b>五种锚点</b><br>几何（翼展、展弦比、梢根比）<br>重量（起飞重量、载荷）<br>动力（电机 KV、桨径、电压）<br>性能（翼载、推重比、最大速度、续航）<br>风格（1 温和 ~ 5 激进）</div>' +
+      '<div class="guideline"><b>不想自己填？</b><br>直接开「案例库」载入标杆案例，6 套现成参数一键回填。</div>' +
+      '<div class="btnrow"><button class="btn sm" id="btnGoCases">打开案例库 →</button></div>' +
+      '</div></div>';
+    if ($('btnGoCases')) $('btnGoCases').onclick = function () { showView('cases'); };
+  }
+
+  /* 清掉搬空的中/右栏，避免空的网格列占位产生留白 */
+  ['colMid', 'colRight'].forEach(function (id) {
+    const el = $(id);
+    if (el && el.children.length === 0 && el.parentNode) el.parentNode.removeChild(el);
+  });
+
+  /* 步骤条搬到输入页顶栏下方 */
+  const sb = $('stepBar');
+  const designView = $('view-design');
+  if (sb && designView && sb.parentNode !== designView) designView.appendChild(sb);
+}
+
+function showStage(which) {
+  STAGE = which === 'result' ? 'result' : 'input';
+  showView(STAGE === 'result' ? 'result' : 'design');
+  if (STAGE === 'result' && S.result) {
+    const t = S.result.top3[S.selected];
+    if ($('resTitle')) $('resTitle').textContent = S.result.typeName + ' · ' + t.label;
+    if ($('resSub')) {
+      const c = t.plan.core;
+      $('resSub').textContent = '得分 ' + t.plan.score.total + ' / 100　·　起飞重量 ' +
+        (isFinite(c.mass) ? c.mass.toFixed(2) : '—') + ' kg　·　翼载 ' +
+        (isFinite(c.wlGdm2) ? c.wlGdm2.toFixed(0) : '—') + ' g/dm²　·　' + (S.result.mode === 'raw' ? '纯输入模式' : '引擎补全模式');
+    }
+  }
+  updateStepBar();
+  // 结果页显示后 3D 才可见，需要重算画布尺寸
+  if (STAGE === 'result') {
+    setTimeout(function () {
+      try { vdInit(); } catch (e) {}
+      if (VD && VD.refresh) VD.refresh();
+    }, 60);
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 /* ---------- 按钮接线 ---------- */
+/* 两段式布局接线 */
+if ($('btnBack')) $('btnBack').onclick = function () { showStage('input'); };
+if ($('btnPlan2')) $('btnPlan2').onclick = function () {
+  if (!checkAnchorsOrWarn()) return;
+  doPlan();
+};
+if ($('btnSaveTop')) $('btnSaveTop').onclick = function () { doSave(); };
+if ($('btnExcelTop')) $('btnExcelTop').onclick = function () {
+  const b = $('btnXlsx');
+  if (b) b.click(); else doExport();
+};
+/* 首次装载：把卡片分配到两个阶段 */
+try { assembleStages(); } catch (e) { console.warn('布局装配失败', e); }
+
 $('btnSave2').onclick = doSave;
 $('btnSaveNew').onclick = doSave;
 $('btnShare').onclick = () => openShare();
