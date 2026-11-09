@@ -433,6 +433,16 @@ table.cmp td.best{color:var(--ok);font-weight:700}
 .faqa{display:none;padding:0 14px 13px;font-size:12px;color:var(--tx2);line-height:1.9}
 .faqitem.on .faqa{display:block}
 .faqitem.on .faqq{color:var(--acc)}
+/* 原生 details/summary（静态 FAQ 用这套，无 JS 也能折叠展开） */
+details.faqitem{background:rgba(255,255,255,.02);border:1px solid var(--line)}
+details.faqitem[open]{border-color:rgba(76,201,240,.35);background:rgba(76,201,240,.05)}
+details.faqitem>summary.faqq{list-style:none;align-items:flex-start}
+details.faqitem>summary.faqq::-webkit-details-marker{display:none}
+details.faqitem>summary.faqq::after{content:'＋';color:var(--tx3);flex:0 0 auto;font-size:13px}
+details.faqitem[open]>summary.faqq::after{content:'－';color:var(--acc)}
+details.faqitem[open]>summary.faqq{color:var(--acc);font-weight:600}
+details.faqitem .faqa{display:block;padding:0 14px 13px}
+details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
 .glosslist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
 .glossitem{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:12px 14px}
 .glossitem .gt{font-size:12.5px;font-weight:600;color:var(--acc)}
@@ -520,6 +530,12 @@ table.cmp td.best{color:var(--ok);font-weight:700}
 
 .cadbtns{display:flex;flex-direction:column;gap:7px;margin-top:4px}
 .cadbtns .btn{width:100%;justify-content:center}
+.cadopts{display:flex;gap:11px;flex-wrap:wrap;align-items:center;margin-bottom:8px;
+  font-size:11px;color:var(--tx2)}
+.cadopts label{display:flex;align-items:center;gap:4px;cursor:pointer}
+.cadopts input[type=number]{background:var(--bg2);border:1px solid var(--line);color:var(--tx);
+  border-radius:5px;padding:2px 5px;font-size:11px;font-family:inherit}
+.btn[disabled]{opacity:.42;cursor:not-allowed}
 
 /* 移动端：折叠分组 / 步骤条 / 纵向按钮 / 44px 点击区 */
 .stepbar{display:none;gap:4px;padding:10px 12px 2px;overflow-x:auto;align-items:center}
@@ -618,7 +634,14 @@ table.cmp td.best{color:var(--ok);font-weight:700}
   <div class="pageinner">
     <h1>标杆案例库</h1>
     <p class="pagesub">每个案例都是一套真实可用的锚点组合 + 设计思路拆解。点「载入到设计器」会把锚点填好并立即生成方案。</p>
-    <div id="caseList" class="caselist"></div>
+    <div id="caseList" class="caselist">
+<article class="casecard" id="case-trainer"><span class="ctag">难度 ★　最适合第一架</span><h3>入门练习机 · 1.2 m 翼展</h3><div class="pm" style="margin:4px 0 8px">难度 <b style="color:var(--warn)">★（1/5）</b>　机型 <b>固定翼 · 练习机</b></div><p class="cwhy"><b>设计目标：</b>一架上手就能飞、摔了容易修、总价控制在 500 元内的电动练习机。</p><p class="cwhy"><b>设计思路：</b>翼载取 45 g/dm² 让失速速度落在 7 m/s 附近，手抛起飞容错大；推重比 0.65 既能爬升又不会因为动力过猛而难控。翼展 1.2 m 是携带与制作成本的平衡点。</p><ul><li>翼型自动推荐会落在 NACA 2412 / 23012 一类，失速和缓</li><li>静稳定裕度建议 14% MAC 左右，首飞先按此设重心</li><li>材料选轻木 + 泡沫，损毁后易修复</li></ul><div class="pm" style="margin-bottom:7px"><b>数值锚点：</b>翼载 = 45 g/dm²　·　推重比 = 0.65　·　目标最大速度 = 20 m/s　·　翼展 = 1.2 m</div><div class="pm" style="margin-bottom:9px"><b>推荐参数：</b>翼型 NACA 2412　·　机身长度 ≈ 870 mm　·　平均弦长 ≈ 222 mm　·　电池 3S 2200 mAh　·　舵机 12 g 金属齿 × 4</div><button class="btn sm pri" type="button" data-case="case-trainer" data-type="trainer" data-name="入门练习机 · 1.2 m 翼展" data-anchors="{&quot;wl&quot;:45,&quot;twr&quot;:0.65,&quot;vmax&quot;:20,&quot;span&quot;:1.2}">载入到设计器并计算</button></article>
+<article class="casecard" id="case-fpvracer"><span class="ctag">难度 ★★★　速度优先</span><h3>FPV 竞速机 · 5 寸穿越</h3><div class="pm" style="margin:4px 0 8px">难度 <b style="color:var(--warn)">★★★（3/5）</b>　机型 <b>竞速机</b></div><p class="cwhy"><b>设计目标：</b>5 寸穿越机，最大速度 40 m/s 以上，抗风好、机动凌厉。</p><p class="cwhy"><b>设计思路：</b>竞速机的核心矛盾是「高翼载换速度」与「低速不能失控」。翼载 85 g/dm² 已经把失速速度推到 13 m/s 以上，所以推重比必须 ≥1.6 才有足够加速与改出余量。</p><ul><li>小展弦比（3~5）薄翼，诱导阻力大但滚转快</li><li>电池选高 C 率（≥100C），否则大油门会掉压</li><li>机架优先碳纤维，抗摔比减重更重要</li></ul><div class="pm" style="margin-bottom:7px"><b>数值锚点：</b>翼载 = 85 g/dm²　·　推重比 = 1.8　·　目标最大速度 = 42 m/s　·　翼展 = 0.75 m</div><div class="pm" style="margin-bottom:9px"><b>推荐参数：</b>翼型 NACA 0012 / 2408　·　电机 2207 2450KV　·　桨 5×4.5 三叶　·　电池 4S 1500 mAh 100C　·　电调 四合一 45A</div><button class="btn sm pri" type="button" data-case="case-fpvracer" data-type="racer" data-name="FPV 竞速机 · 5 寸穿越" data-anchors="{&quot;wl&quot;:85,&quot;twr&quot;:1.8,&quot;vmax&quot;:42,&quot;span&quot;:0.75}">载入到设计器并计算</button></article>
+<article class="casecard" id="case-glider"><span class="ctag">难度 ★★　续航优先</span><h3>滑翔机 · 2 m 热气流</h3><div class="pm" style="margin:4px 0 8px">难度 <b style="color:var(--warn)">★★（2/5）</b>　机型 <b>滑翔机 / 长航时</b></div><p class="cwhy"><b>设计目标：</b>2 m 翼展的手抛/牵引滑翔机，能在弱热气流里长时间滞空。</p><p class="cwhy"><b>设计思路：</b>滑翔机的分数几乎全压在升阻比上，所以展弦比要拉到 10 以上、翼载压到 30 g/dm² 以内。推重比 0.28 只够爬升到起始高度，不需要更大。</p><ul><li>翼型选低阻层流型（65-210）或高升力型（4412）看气流强弱</li><li>结构刚度是展弦比的天花板，碳管主梁别省</li><li>重心宁可略靠前，滑翔机对纵向失稳特别敏感</li></ul><div class="pm" style="margin-bottom:7px"><b>数值锚点：</b>展弦比 = 11　·　翼载 = 26 g/dm²　·　推重比 = 0.28　·　翼展 = 2 m</div><div class="pm" style="margin-bottom:9px"><b>推荐参数：</b>翼型 NACA 4412 / 65-210　·　展弦比 ≈ 11　·　机身长度 ≈ 1050 mm　·　平均弦长 ≈ 180 mm　·　舵机 9 g × 3</div><button class="btn sm pri" type="button" data-case="case-glider" data-type="glider" data-name="滑翔机 · 2 m 热气流" data-anchors="{&quot;ar&quot;:11,&quot;wl&quot;:26,&quot;twr&quot;:0.28,&quot;span&quot;:2}">载入到设计器并计算</button></article>
+<article class="casecard" id="case-edf"><span class="ctag">难度 ★★★★　涵道推进</span><h3>涵道风扇机 · 70 mm EDF</h3><div class="pm" style="margin:4px 0 8px">难度 <b style="color:var(--warn)">★★★★（4/5）</b>　机型 <b>涵道风扇机</b></div><p class="cwhy"><b>设计目标：</b>70 mm 涵道风扇动力的小型喷气像真机，能稳定加速到 40 m/s。</p><p class="cwhy"><b>设计思路：</b>涵道风扇的静推力明显低于同尺寸螺旋桨，所以推重比只能取 0.7 左右，靠翼载与小展弦比薄翼把速度撑起来。起飞需要滑跑或弹射，不能手抛。</p><ul><li>涵道筒进出气面积比影响推力，进气口别做太小</li><li>翼载 95 g/dm² 意味着失速速度接近 11 m/s，低速段要留速度</li><li>风扇转速高，动平衡与进气异物是主要故障源</li></ul><div class="pm" style="margin-bottom:7px"><b>数值锚点：</b>翼载 = 95 g/dm²　·　推重比 = 0.72　·　目标最大速度 = 40 m/s　·　翼展 = 0.9 m</div><div class="pm" style="margin-bottom:9px"><b>推荐参数：</b>翼型 NACA 2408 / 2410　·　动力 EDF 70 mm 2800KV　·　电池 4S 3000 mAh　·　电调 60~80 A　·　尾翼 全动平尾</div><button class="btn sm pri" type="button" data-case="case-edf" data-type="edf" data-name="涵道风扇机 · 70 mm EDF" data-anchors="{&quot;wl&quot;:95,&quot;twr&quot;:0.72,&quot;vmax&quot;:40,&quot;span&quot;:0.9}">载入到设计器并计算</button></article>
+<article class="casecard" id="case-jet"><span class="ctag">难度 ★★★★★　涡喷动力</span><h3>小型喷气机 · 4 kg 涡喷</h3><div class="pm" style="margin:4px 0 8px">难度 <b style="color:var(--warn)">★★★★★（5/5）</b>　机型 <b>小型喷气机</b></div><p class="cwhy"><b>设计目标：</b>4 kg 推力微型涡喷、起飞重量 6 kg 级的像真喷气机。</p><p class="cwhy"><b>设计思路：</b>涡喷的推力不随速度衰减得快，所以高速段效率高；但翼载必须做到 140 g/dm² 才能装下油箱与涡轮。起降滑跑长、失速速度高，对场地要求最严。</p><ul><li>燃油按分钟消耗，续航通常只有 10~15 分钟</li><li>涡喷启动需要 ECU 与接收机独立供电，别和舵机共用 BEC</li><li>高温排气区域的蒙皮必须用耐热材料</li></ul><div class="pm" style="margin-bottom:7px"><b>数值锚点：</b>翼载 = 140 g/dm²　·　推重比 = 0.8　·　目标最大速度 = 62 m/s　·　翼展 = 1.5 m</div><div class="pm" style="margin-bottom:9px"><b>推荐参数：</b>翼型 NACA 2408 / 0010　·　动力 涡喷 4.0 kg　·　燃油 ≈ 2.6 L 煤油　·　舵机 25 g 以上金属齿　·　结构 碳纤维 + 玻纤复合</div><button class="btn sm pri" type="button" data-case="case-jet" data-type="jet" data-name="小型喷气机 · 4 kg 涡喷" data-anchors="{&quot;wl&quot;:140,&quot;twr&quot;:0.8,&quot;vmax&quot;:62,&quot;span&quot;:1.5}">载入到设计器并计算</button></article>
+<article class="casecard" id="case-rotor"><span class="ctag">难度 ★★★　旋翼示例</span><h3>旋翼机 · 5 寸竞速四轴</h3><div class="pm" style="margin:4px 0 8px">难度 <b style="color:var(--warn)">★★★（3/5）</b>　机型 <b>多旋翼</b></div><p class="cwhy"><b>设计目标：</b>5 寸桨竞速四轴，推重比 4、能翻滚与急停。</p><p class="cwhy"><b>设计思路：</b>桨盘载荷 200 N/m² 对应 5 寸桨（127 mm），是竞速机标准配置；推重比 4 才能支撑急加速与翻滚。风格拉到 5（激进），引擎会加大推重比与舵面行程。</p><ul><li>旋翼机型不计算机翼与尾翼，改为旋翼几何与轴距</li><li>电池容量别贪大，否则重量抵消续航收益</li><li>碳纤维机架 + 铝柱，抗摔优先</li></ul><div class="pm" style="margin-bottom:7px"><b>数值锚点：</b>起飞重量 = 0.65 kg　·　桨盘载荷 = 200 N/m²　·　旋翼数量 = 4 个　·　推重比 = 4　·　飞行风格 = 5</div><div class="pm" style="margin-bottom:9px"><b>推荐参数：</b>桨 5×4.5 三叶　·　电机 2207 2450KV　·　电池 4S 1500 mAh　·　电调 四合一 45A　·　轴距 ≈ 180 mm</div><button class="btn sm pri" type="button" data-case="case-rotor" data-type="multirotor" data-name="旋翼机 · 5 寸竞速四轴" data-anchors="{&quot;mass&quot;:0.65,&quot;disk&quot;:200,&quot;nrotor&quot;:4,&quot;twr&quot;:4,&quot;style&quot;:5}">载入到设计器并计算</button></article>
+    </div>
   </div>
 </div>
 
@@ -639,7 +662,20 @@ table.cmp td.best{color:var(--ok);font-weight:700}
       <input type="search" id="faqKw" placeholder="搜索问题关键词，如 锚点 / 校验 / BOM / DXF / 离线" autocomplete="off">
       <span class="hint" id="faqCount"></span>
     </div>
-    <div id="faqList" class="faqlist"></div>
+    <div id="faqList" class="faqlist">
+<details class="faqitem" data-faq="1"><summary class="faqq">数值锚点是什么？</summary><div class="faqa">锚点 = 你明确指定、要求引擎必须采纳的输入参数。例如你勾选「翼载 = 45 g/dm²」，引擎就会以这个值为硬约束反推翼面积与重量。锚点分 5 个维度：几何、重量、动力、性能、风格。至少要给 2 个并覆盖 2 个维度，引擎才能做交叉推理；数量不设上限，给得越多越精确，但可行解空间也越小。</div></details>
+<details class="faqitem" data-faq="2"><summary class="faqq">置信度代表什么？</summary><div class="faqa">置信度是引擎对「这套方案可信程度」的自评，范围 20%~98%，主要由三个因素决定：锚点数量与维度覆盖度、锚点与机型典型配置的偏离程度、约束校验的通过率。它不是「飞行安全概率」，也不代表计算精度——只是提示你：如果锚点很少或严重偏离机型经验区间，结果就只能当方向参考。</div></details>
+<details class="faqitem" data-faq="3"><summary class="faqq">冻结方案后还能修改吗？</summary><div class="faqa">冻结会生成只读快照（含校验码），用于归档与导出，快照本身不可改。但你可以随时「取消冻结」回到可编辑状态，改完再重新冻结。每次冻结都会生成新的校验码，历史快照仍可通过「我的项目 → 历史版本」找回。</div></details>
+<details class="faqitem" data-faq="4"><summary class="faqq">校验码有什么用？</summary><div class="faqa">校验码是对「核心计算结果」做的哈希（形如 DSH-练习机-120S3）。它有两个用途：一是确认你手上的方案文件与当初导出的是否一致；二是团队沟通时用它指代某一具体版本，避免「你说的那版」产生歧义。校验码不包含时间与名称，所以同名不同参数的方案校验码一定不同。</div></details>
+<details class="faqitem" data-faq="5"><summary class="faqq">为什么某些参数超出经验区间仍然能生成方案？</summary><div class="faqa">因为本工具是「设计探索」工具，不是「合规审核」工具。引擎不会因为某一项超出区间就拒绝出结果——否则你就无法试探边界设计。超出区间会以「警告」呈现，严重冲突才标「错误」。错误只保留给物理上不成立的项（如翼面积为负、失速速度超出 2~30 m/s），所以即使有警告，方案仍可能是一架能飞的飞机——只是偏离了该机型的常规做法。</div></details>
+<details class="faqitem" data-faq="6"><summary class="faqq">警告和错误有什么区别？</summary><div class="faqa">三级校验的定义如下：<ul><li><b>通过</b>：实测值落在该机型的经验区间内，无需调整。</li><li><b>警告</b>：超出经验区间，但物理上仍可行。<b>任何超出区间的项都不会显示「通过」</b>。给出方向性建议，你可以选择接受。</li><li><b>错误</b>：物理或几何上不成立的组合（如翼面积 ≤ 0、失速速度 > 30 m/s）。必须修正才能得到可用方案。</li></ul>每项都会附「建议」，告诉你要把参数往哪个方向调。不同机型（练习机 / 竞速机 / 滑翔机 / 涵道机 / 喷气机 / 旋翼机）使用各自的经验区间，同一个数值在不同机型下的判定可能完全不同。</div></details>
+<details class="faqitem" data-faq="7"><summary class="faqq">如何导出 BOM？</summary><div class="faqa">生成方案后，右栏「器件清单与 BOM」卡片会按「电机 → 电调 → 螺旋桨 → 舵机 → 电池」给出推荐型号（每类前三名）。点卡片底部的「导出 BOM JSON」或「导出 BOM CSV」即可下载。CSV 可直接用 Excel 打开，含型号、关键规格、重量、价格等级与购买链接列。若某器件没有收录购买链接，界面只显示型号信息、不显示购买按钮，CSV 中该列留空。</div></details>
+<details class="faqitem" data-faq="8"><summary class="faqq">如何导出翼肋 DXF？</summary><div class="faqa">右栏「建模」标签页 →「制造文件」区 →「下载翼肋 DXF」。文件按当前翼型与根弦长度生成，单位毫米，实体为闭合多段线（POLYLINE），并额外画了主梁过孔图层（SPAR_HOLE）。AutoCAD、LibreCAD、Fusion 360、Inventor 都能直接打开；打开后建议检查 $INSUNITS 是否为 4（毫米）。</div></details>
+<details class="faqitem" data-faq="9"><summary class="faqq">如何导出机身 SVG？</summary><div class="faqa">同样在「建模」标签页的「制造文件」区，点「下载机身侧视 SVG」。SVG 由浏览器原生生成，含机身轮廓、机翼与尾翼截面、重心标记、尺寸标注（总长 / 尾臂 / 根弦 / 机翼厚度），可直接用浏览器打开、打印，或导入 Illustrator / Inkscape / CorelDRAW 继续描图。</div></details>
+<details class="faqitem" data-faq="10"><summary class="faqq">三视图为什么是线框而不是精细模型？</summary><div class="faqa">因为本工具输出的是「概念设计尺寸」，不是已经定稿的曲面模型。线框能最快暴露比例、位置与装配冲突，渲染耗时为 0，而且在任何设备上都不会因为显卡差异而失真。真正的曲面建模应该在 Inventor / SolidWorks 里按「建模参数」表重建——那张表里每项长度都已换算成毫米，可直接输入。</div></details>
+<details class="faqitem" data-faq="11"><summary class="faqq">离线模式如何使用？</summary><div class="faqa">本站是纯前端单页应用，首次加载后会把核心资源注册进 Service Worker 缓存。之后即使断网，用同一个浏览器打开同一地址仍能正常使用全部计算与导出功能。检测到新版本时页面顶部会弹出提示，可选「立即刷新」或「稍后」。注意：清浏览器数据会同时清掉离线缓存。</div></details>
+<details class="faqitem" data-faq="12"><summary class="faqq">方案数据保存在哪里？</summary><div class="faqa">保存在你浏览器的 localStorage（键名 dsh.rcDesigner.v1）。刷新、关标签页都不会丢；但清缓存、换设备、无痕窗口会丢。本站没有服务器与账号体系，所以<b>不存在云端备份</b>。重要方案请用「导出 .dshproj」保存成文件，或「分享」把参数编码进链接留存。「我的项目」页面会显示当前占用了多少 KB，浏览器 localStorage 上限通常 5 MB，每个项目最多保留最近 30 个版本快照。</div></details>
+    </div>
     <h2>术语词典</h2>
     <p class="pagesub">正文里带下划虚线的词，鼠标悬停即可看到释义。</p>
     <div id="glossList" class="glosslist"></div>
@@ -962,7 +998,11 @@ const S = {
   afN: 80,                    // 建模页：翼型坐标点数（单面）
   afChord: null,              // 建模页：坐标缩放弦长 mm（null = 用根弦）
   afCSV: false,               // 建模页：复制坐标时用逗号分隔
-  showRec: true               // 锚点表是否直接显示引擎推荐值（关闭后改为对比表）
+  showRec: true,              // 锚点表是否直接显示引擎推荐值（关闭后改为对比表）
+  optJig: true,               // 制造导出：翼肋加定位孔
+  optSlot: false,             // 制造导出：用矩形梁槽代替圆孔
+  optSlotW: 8, optSlotH: 4,   // 梁槽尺寸 mm
+  optBatch: 4                 // 批量导出站位数量
 };
 
 const DIMCOLOR = { geometry:'#4cc9f0', weight:'#f9c74f', power:'#f8961e', performance:'#90be6d', style:'#c77dff' };
@@ -1801,13 +1841,24 @@ function renderParams() {
       const afChord = S.afChord != null ? S.afChord : +(c.planform.root * 1000).toFixed(1);
       const cc = (typeof AeroLib !== 'undefined' && AeroLib.contour) ? AeroLib.contour(afName, afN, afChord) : null;
       rows.push('<tr><td colspan="4" style="padding:14px 0 4px;font-size:11.5px;font-weight:600;' +
-        'color:var(--acc);letter-spacing:.5px">● 制造文件（可直接加工）</td></tr>');
-      rows.push('<tr><td colspan="4"><div style="font-size:11px;color:var(--tx3);margin-bottom:7px">' +
-        '翼肋 DXF 单位 mm、闭合多段线，含主梁过孔图层；机身 SVG 含轮廓、机翼厚度参考线与尺寸标注。</div>' +
+        'color:var(--acc);letter-spacing:.5px">● 制造文件导出（浏览器端生成，无后端）</td></tr>');
+      rows.push('<tr><td colspan="4"><div style="font-size:11px;color:var(--tx3);margin-bottom:8px">' +
+        '翼肋 DXF：翼型坐标 × 弦长换算毫米、首尾闭合；可选主梁槽 / 定位孔；支持多站位批量打包 zip。<br>' +
+        '机身 SVG：机身轮廓 + 机翼厚度线 + 尾翼 + 关键尺寸标注。</div>' +
+        '<div class="cadopts">' +
+        '<label><input type="checkbox" id="optJig"' + (S.optJig !== false ? ' checked' : '') + '> 定位孔 2×⌀3</label>' +
+        '<label><input type="checkbox" id="optSlot"' + (S.optSlot ? ' checked' : '') + '> 主梁槽（否则圆孔）</label>' +
+        '<label>梁槽 <input type="number" id="optSlotW" value="' + (S.optSlotW || 8) + '" step="0.5" min="2" max="40" style="width:56px"> × ' +
+        '<input type="number" id="optSlotH" value="' + (S.optSlotH || 4) + '" step="0.5" min="1" max="30" style="width:56px"> mm</label>' +
+        '<label>批量 <input type="number" id="optBatch" value="' + (S.optBatch || 4) + '" step="1" min="2" max="12" style="width:48px"> 个站位</label>' +
+        '</div>' +
         '<div class="cadbtns">' +
-        '<button class="btn sm pri" id="btnRibDxf">⤓ 下载翼肋 DXF（' + afName + '，弦长 ' + afChord + ' mm）</button>' +
-        '<button class="btn sm" id="btnFuseSvg">⤓ 下载机身侧视 SVG</button>' +
-        '</div></td></tr>');
+        '<button class="btn sm pri" id="btnRibDxf"' + (S.result ? '' : ' disabled') + '>⤓ 下载翼肋 DXF（' + afName + '，弦长 ' + afChord + ' mm）</button>' +
+        '<button class="btn sm" id="btnRibZip"' + (S.result ? '' : ' disabled') + '>⤓ 批量打包翼肋 ZIP（' + (S.optBatch || 4) + ' 个站位）</button>' +
+        '<button class="btn sm" id="btnFuseSvg"' + (S.result ? '' : ' disabled') + '>⤓ 下载机身侧视 SVG</button>' +
+        '</div>' +
+        (S.result ? '' : '<div class="hint" style="margin-top:6px;color:var(--warn)">生成方案后才能导出制造文件（按钮已置灰）。</div>') +
+        '</td></tr>');
       rows.push('<tr><td colspan="4" style="padding:14px 0 4px;font-size:11.5px;font-weight:600;' +
         'color:var(--acc);letter-spacing:.5px">● 翼型坐标点表（导入 Inventor 直接生成翼型曲线）</td></tr>');
       rows.push('<tr><td colspan="4" style="padding:2px 0 8px">' +
@@ -2560,41 +2611,32 @@ function doImportProject(file) {
 
 /* ---------- 案例库 ---------- */
 function renderCases() {
-  const box = $('caseList');
-  box.innerHTML = '';
-  const DIFF = ['', '★', '★★', '★★★', '★★★★', '★★★★★'];
-  SH.CASES.forEach(c => {
-    const d = document.createElement('div');
-    d.className = 'casecard';
-    const recKeys = Object.keys(c.recommended || {});
-    d.innerHTML =
-      '<span class="ctag">' + esc(c.tag) + '</span>' +
-      '<h3>' + esc(c.name) + '</h3>' +
-      '<div class="pm" style="margin:4px 0 8px">难度 <b style="color:var(--warn)">' + (DIFF[c.difficulty] || '') +
-      '（' + c.difficulty + '/5）</b>　机型 <b>' + esc(DesignEngine.TYPE_BY_ID[c.typeId] ? DesignEngine.TYPE_BY_ID[c.typeId].name : c.typeId) + '</b></div>' +
-      '<p class="cwhy"><b>设计目标：</b>' + esc(c.goal || '') + '</p>' +
-      '<p class="cwhy"><b>设计思路：</b>' + esc(c.why) + '</p>' +
-      '<ul>' + (c.points || []).map(p => '<li>' + esc(p) + '</li>').join('') + '</ul>' +
-      '<div class="pm" style="margin-bottom:7px"><b>数值锚点：</b>' +
-      Object.keys(c.anchors).map(k => {
-        const m = DesignEngine.ANCHOR_BY_ID[k];
-        return (m ? m.label : k) + ' = ' + c.anchors[k] + (m && m.unit ? ' ' + m.unit : '');
-      }).join('　·　') + '</div>' +
-      (recKeys.length ? '<div class="pm" style="margin-bottom:9px"><b>推荐参数：</b>' +
-        recKeys.map(k => esc(k) + ' ' + esc(c.recommended[k])).join('　·　') + '</div>' : '') +
-      '<button class="btn sm pri" data-case="' + c.id + '">载入到设计器并计算</button>';
-    box.appendChild(d);
-    d.querySelector('button').onclick = () => {
-      S.typeId = c.typeId;
-      S.anchors = JSON.parse(JSON.stringify(c.anchors));
+  // 案例内容已写在静态 HTML 里（无 JS 也能读），这里只负责绑定「载入」事件，
+  // 并从 data-anchors 读取锚点，保证与静态展示完全一致。
+  const cards = document.querySelectorAll('#caseList [data-case]');
+  cards.forEach(function (btn) {
+    if (btn.__bound) return;
+    btn.__bound = 1;
+    btn.onclick = function () {
+      let anchors = {};
+      try { anchors = JSON.parse(btn.getAttribute('data-anchors') || '{}'); }
+      catch (e) { toast('案例数据解析失败', 'err'); return; }
+      const typeId = btn.getAttribute('data-type');
+      const name = btn.getAttribute('data-name') || '标杆案例';
+      S.typeId = typeId;
+      S.anchors = {};
+      Object.keys(anchors).forEach(function (k) {
+        if (DesignEngine.ANCHOR_BY_ID[k]) S.anchors[k] = anchors[k];
+      });
       S.locks = {};
-      S.name = c.name;
+      S.name = name;
       CUR_PROJECT = null;
       showView('design');
       renderTypes(); renderAnchors();
       doPlan();
       updateStepBar();
-      toast('已载入案例「' + c.name + '」', 'ok');
+      const n = Object.keys(S.anchors).length;
+      toast('已载入「' + name + '」：' + n + ' 个锚点已回填并触发计算', 'ok');
     };
   });
 }
@@ -2603,30 +2645,35 @@ function renderCases() {
 
 
 function renderFaq(kw) {
+  // FAQ 正文已写在静态 HTML 的 details 元素里（原生折叠，无 JS 也可用）。
+  // 这里只做关键词过滤：隐藏不匹配项，匹配项自动展开。
   const box = $('faqList');
+  if (!box) return;
   const q = String(kw == null ? (S.faqKw || '') : kw).trim().toLowerCase();
   S.faqKw = q;
-  const list = SH.FAQ || [];
-  const hit = q ? list.filter(f => (f.q + ' ' + f.a).toLowerCase().indexOf(q) >= 0) : list;
-  box.innerHTML = hit.length
-    ? hit.map((f, i) => {
-      const open = !!q;   // 搜索时自动展开命中项
-      return '<div class="faqitem' + (open ? ' on' : '') + '">' +
-        '<div class="faqq"><span>' + esc(f.q) + '</span><span>' + (open ? '－' : '＋') + '</span></div>' +
-        '<div class="faqa">' + f.a + '</div></div>';
-    }).join('')
-    : '<div class="empty2">没有匹配「' + esc(q) + '」的问题。试试「锚点」「校验」「BOM」「DXF」「离线」。</div>';
-  box.querySelectorAll('.faqitem').forEach(function (d) {
-    const h = d.querySelector('.faqq');
-    if (!h) return;
-    h.onclick = function () {
-      d.classList.toggle('on');
-      const sp = d.querySelector('.faqq span:last-child');
-      if (sp) sp.textContent = d.classList.contains('on') ? '－' : '＋';
-    };
+  const items = box.querySelectorAll('details.faqitem');
+  let shown = 0;
+  items.forEach(function (d) {
+    const text = (d.textContent || '').toLowerCase();
+    const hit = !q || text.indexOf(q) >= 0;
+    d.style.display = hit ? '' : 'none';
+    d.open = !!q && hit;          // 搜索时自动展开命中项
+    if (hit) shown++;
   });
   const cnt = $('faqCount');
-  if (cnt) cnt.textContent = hit.length + ' / ' + list.length + ' 题';
+  if (cnt) cnt.textContent = shown + ' / ' + items.length + ' 题';
+  let empty = box.querySelector('.faqempty');
+  if (!shown) {
+    if (!empty) {
+      empty = document.createElement('div');
+      empty.className = 'empty2 faqempty';
+      box.appendChild(empty);
+    }
+    empty.textContent = '没有匹配「' + q + '」的问题。试试「锚点」「校验」「BOM」「DXF」「离线」。';
+    empty.style.display = '';
+  } else if (empty) {
+    empty.style.display = 'none';
+  }
 }
 
 function renderGlossary() {
@@ -2933,17 +2980,51 @@ function cadAirfoil() {
   const chordMM = +(c.planform.root * 1000).toFixed(1);
   return { af: af, chordMM: chordMM, contour: AeroLib.contour(af, 80, chordMM) };
 }
+/** 读取制造导出选项 */
+function cadOpts() {
+  const spar = (S.result && S.result.best.core.structure && S.result.best.core.structure.sparDiaMM) || 6;
+  return {
+    sparDiaMM: S.optSlot ? null : spar,
+    sparSlot: S.optSlot ? { w: +(S.optSlotW || 8), h: +(S.optSlotH || 4) } : null,
+    sparPosPct: 0.30,
+    jig: S.optJig !== false
+  };
+}
 $('btnRibDxf').onclick = function () {
-  if (!S.result) { toast('请先生成方案', 'err'); return; }
+  if (!S.result) { toast('请先生成方案（按钮已置灰）', 'err'); return; }
   const a = cadAirfoil();
-  const spar = (S.result.best.core.structure && S.result.best.core.structure.sparDiaMM) || 6;
-  const r = CadExport.ribDxf(a.contour, { chordMM: a.chordMM, airfoil: a.af, sparDiaMM: spar, sparPosPct: 30 });
+  const r = CadExport.ribDxf(a.contour, Object.assign({ chordMM: a.chordMM, airfoil: a.af }, cadOpts()));
   if (!r.ok) { toast('DXF 生成失败：' + r.error, 'err'); return; }
   dlText(r.filename, r.dxf, 'application/dxf');
-  toast('翼肋 DXF 已导出（' + r.pointCount + ' 点，弦长 ' + Math.round(a.chordMM) + ' mm）', 'ok');
+  toast('翼肋 DXF 已导出（' + r.pointCount + ' 点，弦长 ' + Math.round(a.chordMM) + ' mm' +
+    (r.features.length ? '，' + r.features.join('，') : '') + '）', 'ok');
+};
+$('btnRibZip').onclick = function () {
+  if (!S.result) { toast('请先生成方案（按钮已置灰）', 'err'); return; }
+  const plan = S.result.top3[S.selected].plan;
+  const c = plan.core;
+  const af = c.airfoil ? c.airfoil.designation : 'NACA 2412';
+  const n = Math.max(2, Math.min(12, Math.round(S.optBatch || 4)));
+  const rootMM = c.planform.root * 1000;
+  const tipMM = c.planform.tip * 1000;
+  const list = [];
+  for (let i = 0; i < n; i++) {
+    const f = n === 1 ? 1 : i / (n - 1);                 // 0=翼根 1=翼尖
+    const ch = +(rootMM + (tipMM - rootMM) * f).toFixed(1);
+    list.push({ chordMM: ch, contour: AeroLib.contour(af, 80, ch), airfoil: af });
+  }
+  const b = CadExport.ribBatch(list, Object.assign({ airfoil: af }, cadOpts()));
+  if (!b.ok) { toast('批量导出失败：没有可生成的翼肋', 'err'); return; }
+  const blob = new Blob([b.zip], { type: 'application/zip' });
+  const a2 = document.createElement('a');
+  a2.href = URL.createObjectURL(blob);
+  a2.download = b.filename;
+  document.body.appendChild(a2); a2.click();
+  setTimeout(function () { URL.revokeObjectURL(a2.href); a2.remove(); }, 1500);
+  toast('已打包 ' + b.count + ' 件翼肋（' + Math.round(rootMM) + '→' + Math.round(tipMM) + ' mm）+ 清单', 'ok');
 };
 $('btnFuseSvg').onclick = function () {
-  if (!S.result) { toast('请先生成方案', 'err'); return; }
+  if (!S.result) { toast('请先生成方案（按钮已置灰）', 'err'); return; }
   const plan = S.result.top3[S.selected].plan;
   const geo = CadExport.geoFromCore(plan.core, S.result.modelingParams,
     { typeName: S.result.typeName, projectName: S.name || (S.naming && S.naming.name) || '方案' });
@@ -2952,6 +3033,19 @@ $('btnFuseSvg').onclick = function () {
   dlText(r.filename, r.svg, 'image/svg+xml');
   toast('机身侧视 SVG 已导出（' + r.width + '×' + r.height + '）', 'ok');
 };
+/* 制造导出选项的联动 */
+['optJig', 'optSlot', 'optSlotW', 'optSlotH', 'optBatch'].forEach(function (id) {
+  const el = $(id);
+  if (!el) return;
+  el.onchange = function () {
+    if (id === 'optJig') S.optJig = el.checked;
+    if (id === 'optSlot') S.optSlot = el.checked;
+    if (id === 'optSlotW') S.optSlotW = Number(el.value) || 8;
+    if (id === 'optSlotH') S.optSlotH = Number(el.value) || 4;
+    if (id === 'optBatch') S.optBatch = Number(el.value) || 4;
+    renderParams();
+  };
+});
 
 /* =====================================================================
  * 移动端：步骤条 / 卡片折叠
