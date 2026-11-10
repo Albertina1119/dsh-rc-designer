@@ -655,6 +655,8 @@
 
     /* ---------- 7 尾翼参数 ---------- */
     const tailSh = c.tail ? c.tail.Sh : NaN;
+    const tl = (c.tail || {});
+    const mat = c.material || null;
     const tailSv = c.tail ? c.tail.Sv : NaN;
     defs.push({
       name: '尾翼参数', freeze: 0,
@@ -664,18 +666,26 @@
         [],
         header(['参数', '推荐值', '单位', '说明 / 公式', '', '']),
         pad(kv('平尾面积 Sh', num(tailSh * 1e4), 'cm²', 'Vh = Sh·lh / (S·MAC)'), 4),
-        pad(kv('平尾展长', num(Math.sqrt(Math.max(0, tailSh) * (c.ar * 0.55)) * 1000), 'mm',
-          '按平尾展弦比约 ' + num(c.ar * 0.55) + ' 估算'), 4),
-        pad(kv('平尾平均弦长', num((tailSh / Math.max(0.01, Math.sqrt(Math.max(0, tailSh) * c.ar * 0.55))) * 1000), 'mm',
-          'Sh / 平尾展长'), 4),
-        pad(kv('平尾容量 Vh', num(c.tail && c.tail.vh), '', '常规经验区间 0.35 ~ 0.72'), 4),
-        pad(kv('升降舵弦长比', num(c.tail && c.tail.elevRatio * 100), '% 局部弦长', '常规 35 ~ 45%'), 4),
+        pad(kv('平尾翼展', num(tl.spanH * 1000), 'mm', '含升降舵，翼尖到翼尖'), 4),
+        pad(kv('平尾根弦', num(tl.rootChordH * 1000), 'mm', '按梢根比 ' + num((tl.taperH || 0.8) * 100) + '% 反推'), 4),
+        pad(kv('平尾尖弦', num(tl.tipChordH * 1000), 'mm', '根弦 × 梢根比'), 4),
+        pad(kv('平尾平均弦长', num(tl.chordH * 1000), 'mm', 'Sh / 翼展'), 4),
+        pad(kv('平尾展弦比 ARh', num(tl.arH), '', '翼展² / 面积'), 4),
+        pad(kv('平尾容量 Vh', num(tl.vh), '', '常规经验区间 0.35 ~ 0.72'), 4),
+        pad(kv('升降舵弦长', num(tl.elevatorChord * 1000), 'mm', '弦长比 ' + num((tl.elevRatio || 0) * 100) + '%'), 4),
         pad(kv('垂尾面积 Sv', num(tailSv * 1e4), 'cm²', 'Vv = Sv·lv / (S·b)'), 4),
-        pad(kv('垂尾高度', num(Math.sqrt(Math.max(0, tailSv) * 1.6) * 1000), 'mm', '按垂尾展弦比约 1.6 估算'), 4),
-        pad(kv('垂尾容量 Vv', num(c.tail && c.tail.vv), '', '常规经验区间 0.022 ~ 0.070'), 4),
-        pad(kv('方向舵弦长比', num(c.tail && c.tail.rudderRatio * 100), '% 局部弦长', '常规 35 ~ 45%'), 4),
-        pad(kv('尾臂 lh（重心→平尾焦点）', num(c.tail && c.tail.lh * 1000), 'mm', '影响俯仰力矩与配平'), 4),
-        pad(kv('尾臂 lv（重心→垂尾焦点）', num(c.tail && c.tail.lv * 1000), 'mm', ''), 4),
+        pad(kv('垂尾高度（翼展）', num(tl.spanV * 1000), 'mm', '根部到翼尖的垂直距离'), 4),
+        pad(kv('垂尾根弦', num(tl.rootChordV * 1000), 'mm', '按梢根比 ' + num((tl.taperV || 0.75) * 100) + '% 反推'), 4),
+        pad(kv('垂尾尖弦', num(tl.tipChordV * 1000), 'mm', '根弦 × 梢根比'), 4),
+        pad(kv('垂尾展弦比 ARv', num(tl.arV), '', '高度² / 面积'), 4),
+        pad(kv('垂尾容量 Vv', num(tl.vv), '', '常规经验区间 0.022 ~ 0.070'), 4),
+        pad(kv('方向舵弦长', num(tl.rudderChord * 1000), 'mm', '弦长比 ' + num((tl.rudderRatio || 0) * 100) + '%'), 4),
+        pad(kv('尾臂 lh（重心→平尾焦点）', num(tl.lh * 1000), 'mm', '影响俯仰力矩与配平'), 4),
+        pad(kv('尾臂 lv（重心→垂尾焦点）', num(tl.lv * 1000), 'mm', ''), 4),
+        pad(kv('平尾材质', mat && mat.tail ? mat.tail.h.material : NA, '', mat && mat.tail ? mat.tail.h.reason : ''), 6),
+        pad(kv('平尾结构方案', mat && mat.tail ? mat.tail.h.structure : NA, '', mat && mat.tail ? ('难度 ' + mat.tail.h.difficulty + '，成本 ' + mat.tail.h.cost) : ''), 6),
+        pad(kv('垂尾材质', mat && mat.tail ? mat.tail.v.material : NA, '', mat && mat.tail ? mat.tail.v.reason : ''), 6),
+        pad(kv('垂尾结构方案', mat && mat.tail ? mat.tail.v.structure : NA, '', mat && mat.tail ? ('难度 ' + mat.tail.v.difficulty + '，成本 ' + mat.tail.v.cost) : ''), 6),
         pad(kv('尾翼翼型建议', isRotary ? NA : '对称翼型 NACA 0009 ~ 0012', '', '对称翼型正反舵效一致'), 4)
       ]
     });
@@ -775,7 +785,28 @@
         pad(kv('升降舵舵机', num(stc.servoElevator), 'kg·cm', ''), 4),
         pad(kv('方向舵舵机', num(stc.servoRudder), 'kg·cm', ''), 4),
         pad(kv('蒙皮建议', af.tc > 0.14 ? '泡沫 / 巴尔沙蒙皮，局部碳纤维加强' : '热缩膜或玻璃纤维蒙皮', '', ''), 4),
-        pad(kv('加工难度', c.area < 0.25 ? '中等（小尺寸，精度要求高）' : '常规（板材切割 + 木工）', '', ''), 4)
+        pad(kv('加工难度', c.area < 0.25 ? '中等（小尺寸，精度要求高）' : '常规（板材切割 + 木工）', '', ''), 4),
+        [],
+        pad([{ v: '▶ 机翼制造材料（按用途推荐）', style: S.sub }], 6),
+        pad(kv('机翼材质（推荐）', mat ? mat.wing.primary : NA, '', mat && mat.wing.reasons[0] ? mat.wing.reasons[0] : ''), 6),
+        pad(kv('机翼结构方案', mat ? mat.wing.structure : NA, '', '按用途与载荷选型'), 6),
+        pad(kv('主梁方案', mat ? mat.wing.spar : NA, '', '承弯构件'), 6),
+        pad(kv('蒙皮方案', mat ? mat.wing.skin : NA, '', '承扭与外形精度'), 6),
+        pad(kv('翼肋方案', mat ? mat.wing.ribs : NA, '', '维持翼型形状'), 6),
+        pad(kv('制造工艺', mat ? mat.wing.process : NA, '',
+          mat ? ('难度 ' + mat.wing.difficulty + '，成本 ' + mat.wing.cost + '，重量 ' + mat.wing.weight) : ''), 6),
+        pad(kv('选型理由', mat ? mat.wing.reasons.join('；') : NA, '', ''), 6),
+        pad(kv('备选方案', mat ? mat.wing.alternatives.map(function (a) { return a.name; }).join(' / ') : NA, '',
+          mat ? mat.wing.alternatives.map(function (a) { return a.name + '：适用 ' + a.when + '，代价 ' + a.tradeoff; }).join('；') : ''), 6),
+        pad(kv('不推荐做法', mat ? mat.wing.avoid.join('；') : NA, '', '这些做法在该用途下会明显吃亏'), 6),
+        [],
+        pad([{ v: '▶ 尾翼材质', style: S.sub }], 6),
+        pad(kv('平尾材质', mat && mat.tail ? mat.tail.h.material : NA, '', mat && mat.tail ? mat.tail.h.reason : ''), 6),
+        pad(kv('平尾结构方案', mat && mat.tail ? mat.tail.h.structure : NA, '',
+          mat && mat.tail ? ('难度 ' + mat.tail.h.difficulty + '，成本 ' + mat.tail.h.cost) : ''), 6),
+        pad(kv('垂尾材质', mat && mat.tail ? mat.tail.v.material : NA, '', mat && mat.tail ? mat.tail.v.reason : ''), 6),
+        pad(kv('垂尾结构方案', mat && mat.tail ? mat.tail.v.structure : NA, '',
+          mat && mat.tail ? ('难度 ' + mat.tail.v.difficulty + '，成本 ' + mat.tail.v.cost) : ''), 6)
       ]
     });
 
@@ -869,7 +900,7 @@
       name: '约束校验', freeze: 1,
       cols: [{ w: 12 }, { w: 12 }, { w: 28 }, { w: 20 }, { w: 22 }, { w: 54 }],
       rows: [
-        pad([{ v: '十、约束校验', style: S.title }], 6),
+        pad([{ v: '十二、约束校验', style: S.title }], 6),
         [],
         pad(kv('硬约束错误', nErr, '项', nErr ? '存在硬约束冲突，方案需调整' : '全部通过', nErr ? S.error : S.ok), 4),
         pad(kv('软约束警告', nWarn, '项', nWarn ? '建议关注' : '无警告', nWarn ? S.warn : S.ok), 4),
@@ -903,7 +934,7 @@
       name: '评分明细', freeze: 0,
       cols: [{ w: 16 }, { w: 12 }, { w: 12 }, { w: 68 }, { w: 16 }, { w: 16 }],
       rows: [
-        pad([{ v: '十一、多目标评分', style: S.title }], 6),
+        pad([{ v: '十三、多目标评分', style: S.title }], 6),
         [],
         section('六维度得分（0~100，越高越好）', 4)
       ].concat(scoreRows).concat([
@@ -928,7 +959,7 @@
     defs.push({
       name: '推荐理由', freeze: 0,
       cols: [{ w: 8 }, { w: 118 }, { w: 16 }, { w: 16 }, { w: 16 }, { w: 16 }],
-      rows: [pad([{ v: '十二、推荐理由与警告', style: S.title }], 6), [], section('逐方案说明', 6)].concat(reasonRows)
+      rows: [pad([{ v: '十四、推荐理由与警告', style: S.title }], 6), [], section('逐方案说明', 6)].concat(reasonRows)
     });
 
     /* ---------- 14 方案对比 ---------- */
@@ -985,7 +1016,7 @@
     defs.push({
       name: '方案对比', freeze: 1,
       cols: [{ w: 26 }, { w: 26 }, { w: 26 }, { w: 26 }, { w: 16 }, { w: 16 }],
-      rows: [pad([{ v: '十三、方案对比', style: S.title }], 6), [], section('重点参数逐项对比', 6)].concat(cmp2)
+      rows: [pad([{ v: '十五、方案对比', style: S.title }], 6), [], section('重点参数逐项对比', 6)].concat(cmp2)
     });
 
     /* ---------- 15 飞机命名 ---------- */
@@ -997,7 +1028,7 @@
       name: '飞机命名', freeze: 0,
       cols: [{ w: 34 }, { w: 30 }, { w: 16 }, { w: 16 }, { w: 16 }, { w: 16 }],
       rows: [
-        pad([{ v: '十四、飞机命名（非必填）', style: S.title }], 6),
+        pad([{ v: '十六、飞机命名（非必填）', style: S.title }], 6),
         [],
         pad(kv('最终名称', naming.name || '（未命名，已跳过）', '', S.value), 4),
         pad(kv('命名方式', naming.skipped ? '跳过命名' : (naming.custom ? '用户自定义' : '引擎自动生成'), '',
@@ -1053,7 +1084,7 @@
       name: '公式依赖', freeze: 1,
       cols: [{ w: 22 }, { w: 62 }, { w: 46 }, { w: 12 }, { w: 16 }, { w: 16 }],
       rows: [
-        pad([{ v: '十五、公式依赖清单', style: S.title }], 6),
+        pad([{ v: '十七、公式依赖清单', style: S.title }], 6),
         [],
         section('本方案用到的全部计算公式与依赖关系', 6),
         header(['公式 ID', '表达式', '用途', '单位', '', ''])
@@ -1079,7 +1110,7 @@
       name: '版本历史', freeze: 1,
       cols: [{ w: 14 }, { w: 26 }, { w: 72 }, { w: 16 }, { w: 16 }, { w: 16 }],
       rows: [
-        pad([{ v: '十六、版本历史与快照', style: S.title }], 6),
+        pad([{ v: '十八、版本历史与快照', style: S.title }], 6),
         [],
         pad(kv('快照校验码', snap.checksum || '—', '基于核心计算结果的哈希，可用于确认方案未被改动', S.value), 4),
         pad(kv('快照时间', snap.createdAt || '—', ''), 4),
