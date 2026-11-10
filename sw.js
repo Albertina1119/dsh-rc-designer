@@ -1,17 +1,18 @@
 /*!
- * sw.js —— Service Worker（离线优先 + 版本更新提示）
+ * sw.js —— Service Worker（离线可用 + 绝不让用户卡在旧版本）
  *
- * 策略（对应方案 8 的「静态资源缓存优先」）：
- *   · 预缓存：首页 + 4 个脚本 + manifest + robots/sitemap
- *   · 导航请求（HTML）：网络优先，失败回退缓存 → 保证更新能及时拿到，断网仍可打开
- *   · 静态资源（js/css/svg…）：缓存优先，命中即返回，未命中走网络并回填缓存
- *   · 更新：新 SW 装好后进入 waiting，由页面提示用户；收到 SKIP_WAITING 立即接管
+ * 修复的关键问题：早期版本对所有静态资源都用「缓存优先」，
+ * 结果升级后会出现「新 HTML + 旧 JS」的混搭，界面上的新功能整块消失，
+ * 看起来就像「功能被改没了」。现在改为：
  *
- * 说明：方案指定用 vite-plugin-pwa（prompt 模式）；本项目是零构建静态站，
- * 没有 Vite 构建管线，因此用等价的「手写 SW + 页面更新提示」实现同样行为：
- * 更新不自动接管，由用户点「立即刷新」或「稍后」决定。
+ *   · 导航请求（HTML）      → 网络优先，断网回退缓存
+ *   · 代码资源（js/json）    → 网络优先，断网回退缓存  ← 关键修正
+ *   · 大体积不变资源（three.min.js、图标）→ 缓存优先（内容不变，省流量）
+ *   · 更新                   → 新 SW 装好进 waiting，由页面提示；收到 SKIP_WAITING 才接管
+ *
+ * 这样在线用户永远拿到最新代码，离线用户仍有完整可用副本。
  */
-const VERSION = 'v1.6.0';
+const VERSION = 'v1.7.0';
 const CACHE = 'dsh-rc-' + VERSION;
 
 const PRECACHE = [
@@ -23,20 +24,23 @@ const PRECACHE = [
   './app-shell.js',
   './devices-lib.js',
   './cad-export.js',
+  './viewer3d.js',
   './manifest.json',
+  './icon-192.svg',
+  './icon-512.svg',
   './robots.txt',
   './sitemap.xml'
 ];
 
+/* 内容不会变、体积大 → 缓存优先 */
+const IMMUTABLE = /vendor\/three\.min\.js|icon-\d+\.svg$/;
+
 self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
-      // 逐个 add，单个失败不影响整体安装
       return Promise.all(PRECACHE.map(function (u) {
         return c.add(new Request(u, { cache: 'reload' })).catch(function () { return null; });
       }));
-    }).then(function () {
-      // 不自动接管：等页面提示用户后发 SKIP_WAITING
     })
   );
 });
@@ -48,9 +52,7 @@ self.addEventListener('activate', function (e) {
         if (k !== CACHE && k.indexOf('dsh-rc-') === 0) return caches.delete(k);
         return null;
       }));
-    }).then(function () {
-      return self.clients.claim();
-    })
+    }).then(function () { return self.clients.claim(); })
   );
 });
 
@@ -58,47 +60,49 @@ self.addEventListener('message', function (e) {
   if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
+/** 网络优先：拿得到就用网络，顺手更新缓存；拿不到回退缓存 */
+function networkFirst(req) {
+  return fetch(req).then(function (res) {
+    if (res && res.status === 200 && res.type === 'basic') {
+      const copy = res.clone();
+      caches.open(CACHE).then(function (c) { c.put(req, copy).catch(function () {}); });
+    }
+    return res;
+  }).catch(function () {
+    return caches.match(req).then(function (hit) {
+      return hit || caches.match('./index.html') || caches.match('./');
+    });
+  });
+}
+
+/** 缓存优先：命中即返回 */
+function cacheFirst(req) {
+  return caches.match(req).then(function (hit) {
+    if (hit) return hit;
+    return fetch(req).then(function (res) {
+      if (res && res.status === 200 && res.type === 'basic') {
+        const copy = res.clone();
+        caches.open(CACHE).then(function (c) { c.put(req, copy).catch(function () {}); });
+      }
+      return res;
+    }).catch(function () {
+      return new Response('', { status: 504, statusText: 'Offline' });
+    });
+  });
+}
+
 self.addEventListener('fetch', function (e) {
   const req = e.request;
   if (req.method !== 'GET') return;
 
   let url;
   try { url = new URL(req.url); } catch (err) { return; }
-  // 只处理同源请求
   if (url.origin !== self.location.origin) return;
 
-  const isNavigate = req.mode === 'navigate' ||
-    (req.headers.get('accept') || '').indexOf('text/html') >= 0;
-
-  if (isNavigate) {
-    // 导航：网络优先，失败回退缓存（断网仍能打开首页）
-    e.respondWith(
-      fetch(req).then(function (res) {
-        const copy = res.clone();
-        caches.open(CACHE).then(function (c) { c.put(req, copy).catch(function () {}); });
-        return res;
-      }).catch(function () {
-        return caches.match(req).then(function (hit) {
-          return hit || caches.match('./index.html') || caches.match('./');
-        });
-      })
-    );
+  if (IMMUTABLE.test(url.pathname)) {
+    e.respondWith(cacheFirst(req));
     return;
   }
-
-  // 静态资源：缓存优先
-  e.respondWith(
-    caches.match(req).then(function (hit) {
-      if (hit) return hit;
-      return fetch(req).then(function (res) {
-        if (res && res.status === 200 && res.type === 'basic') {
-          const copy = res.clone();
-          caches.open(CACHE).then(function (c) { c.put(req, copy).catch(function () {}); });
-        }
-        return res;
-      }).catch(function () {
-        return new Response('', { status: 504, statusText: 'Offline' });
-      });
-    })
-  );
+  // HTML / JS / JSON / 其他：网络优先，保证在线用户永远是最新代码
+  e.respondWith(networkFirst(req));
 });
