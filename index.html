@@ -1214,6 +1214,33 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
 /* =====================================================================
  * 应用状态
  * =================================================================== */
+/* =====================================================================
+ * 模块级可变状态：必须在脚本最顶部用 var 统一声明
+ *
+ * 曾出现的问题：这些变量原本用 let 分散声明在文件中部（例如 let TAB 在第 2100 行），
+ * 而 doPlan() 定义在第 430 行就会调用到 showTab()/updateTabCounts()。
+ * 只要脚本顶部有任何一行提前触发 doPlan（初始化、恢复会话、沙箱环境等），
+ * 就会撞上「Cannot access 'TAB' before initialization」的 TDZ 错误，
+ * 表现为「点了生成没反应 / 结果页出不来」。
+ * 用 var 声明可被提升并初始化为 undefined，从根上消除这类时序问题。
+ * ===================================================================== */
+/* 视图清单：showView() 在脚本顶部就会被调用到，必须最先声明（否则 TDZ） */
+var VIEWS = ['design', 'result', 'projects', 'cases', 'help', 'about'];
+/** 安全滚动：沙箱 / 老浏览器里 window.scrollTo 可能不存在或不是函数 */
+function scrollTop(smooth) {
+  try {
+    if (typeof window.scrollTo !== 'function') return;
+    if (smooth) window.scrollTo({ top: 0, behavior: 'smooth' });
+    else window.scrollTo(0, 0);
+  } catch (e) {}
+}
+var STAGE = 'input';          // 'input' | 'result'
+var TAB = 'compare';          // 结果页当前标签
+var VD = null;                // Viewer3D 实例
+var VD_LAYOUT = 'quad';       // 3D 布局
+var CUR_BOM = null;           // 当前 BOM
+var SW_REG = null, SW_WAITING = null;   // Service Worker
+
 const S = {
   typeId: 'trainer',          // null = 自动识别
   anchors: {},                // { key: 数值 }
@@ -1507,10 +1534,10 @@ function renderAnchors() {
 }
 
 function updateAnchorHint() {
-  const keys = Object.keys(S.anchors);
+  const keys = realAnchorKeys();
   const n = keys.length;
   $('anchorCount').textContent = n + ' 个（不限上限）';
-  const dims = new Set(keys.map(k => DesignEngine.ANCHOR_BY_ID[k].dim));
+  const dims = new Set(keys.map(k => DesignEngine.ANCHOR_BY_ID[k].dim).filter(Boolean));
   const okN = n >= 2;
   const okD = dims.size >= 2;
   $('btnPlan').disabled = !(okN && okD);
@@ -1533,10 +1560,25 @@ function updateAnchorHint() {
 }
 
 /** 生成方案前的校验：不满足条件则弹窗警告并返回 false */
+/* ---------- 有用的工具：只取「真正的数值锚点」----------
+ * S.anchors 里可能混入非数值项（例如 airfoil 是字符串翼型编号），
+ * 它们不参与锚点计数、维度统计与表格渲染 —— 直接 Object.keys(S.anchors)
+ * 会让 ANCHOR_BY_ID[k] 为 undefined，进而 .dim / .label 抛异常，
+ * 表现就是「设了自定义翼型后点生成没反应」。
+ */
+function realAnchorKeys() {
+  return Object.keys(S.anchors).filter(function (k) {
+    return DesignEngine.ANCHOR_BY_ID[k] && isFinite(S.anchors[k]) && S.anchors[k] !== '' && S.anchors[k] !== null;
+  });
+}
+function anchorDims() {
+  return new Set(realAnchorKeys().map(function (k) { return DesignEngine.ANCHOR_BY_ID[k].dim; }));
+}
+
 function checkAnchorsOrWarn() {
-  const keys = Object.keys(S.anchors);
+  const keys = realAnchorKeys();
   const n = keys.length;
-  const dims = new Set(keys.map(k => DesignEngine.ANCHOR_BY_ID[k].dim));
+  const dims = anchorDims();
   if (n >= 2 && dims.size >= 2) return true;
 
   const MIN = 2;
@@ -2604,7 +2646,7 @@ $('btnNameSkip').onclick = () => {
 $('btnFreeze').onclick = freezePlan;
 $('btnXlsx').onclick = exportXlsx;
 // 页头精简后这两个按钮已移入「更多」菜单，这里做空值保护（保留兼容）
-if ($('btnTop')) $('btnTop').onclick = () => window.scrollTo({ top: 0, behavior: 'smooth' });
+if ($('btnTop')) $('btnTop').onclick = () => scrollTop(true);
 if ($('btnReset')) $('btnReset').onclick = () => { S.anchors = {}; S.anchorsConfirmed = false; renderAnchors(); toast('已清空锚点', 'ok'); };
 $('btnDemo').onclick = () => {
   S.typeId = 'trainer';
@@ -2643,7 +2685,6 @@ let SAVE_SEQ = 0;
 let CUR_PROJECT = null;      // 当前正在编辑的项目 id
 
 /* ---------- 视图切换 ---------- */
-const VIEWS = ['design', 'result', 'projects', 'cases', 'help', 'about'];
 function showView(v) {
   VIEWS.forEach(k => {
     const el = $('view-' + k);
@@ -2652,7 +2693,7 @@ function showView(v) {
   document.querySelectorAll('#mainNav a').forEach(a => {
     a.classList.toggle('on', a.dataset.view === v);
   });
-  if (v !== 'design') window.scrollTo(0, 0);
+  if (v !== 'design') scrollTop(false);
   if (v === 'projects') renderProjects();
   if (v === 'cases') renderCases();
   if (v === 'help') { renderFaq(); renderGlossary(); }
@@ -2676,7 +2717,7 @@ document.querySelectorAll('#moreMenu button').forEach(b => {
     else if (act === 'import') $('filePick').click();
     else if (act === 'export') doExportProject();
     else if (act === 'tour') startTour();
-    else if (act === 'top') window.scrollTo({ top: 0, behavior: 'smooth' });
+    else if (act === 'top') scrollTop(true);
   };
 });
 
@@ -2717,7 +2758,7 @@ function applyState(st) {
     if (st.showRec === false) S.showRec = false; else if (st.showRec === true) S.showRec = true;
     if (st.name) { S.name = st.name; }
     renderTypes(); renderAnchors();
-    if (Object.keys(S.anchors).length >= 2) { doPlan(); return true; }
+    if (realAnchorKeys().length >= 2) { doPlan(); return true; }
     return false;
   } catch (e) { console.error(e); return false; }
 }
@@ -2920,7 +2961,7 @@ function renderCases() {
       renderTypes(); renderAnchors();
       doPlan();
       updateStepBar();
-      const n = Object.keys(S.anchors).length;
+      const n = realAnchorKeys().length;
       toast('已载入「' + name + '」：' + n + ' 个锚点已回填并触发计算', 'ok');
     };
   });
@@ -3086,7 +3127,6 @@ function endTour() {
  *   第 2 段（结果）：方案 ×3 / 三视图 / 完整参数 / 校验 / 评分 / 对比 / BOM / 合规 / 导出
  * 卡片元素本身不重建，只换父节点，因此已绑定的事件与内部状态全部保留。
  * =================================================================== */
-let STAGE = 'input';
 function assembleStages() {
   const move = function (id, parentId, beforeEl) {
     const el = $(id), p = $(parentId);
@@ -3166,7 +3206,7 @@ function showStage(which) {
       if (VD && VD.refresh) VD.refresh();
     }, 60);
   }
-  try { if (window.scrollTo) window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
+  scrollTop(true);
 }
 
 /* =====================================================================
@@ -3305,7 +3345,6 @@ if ($('btnMatTxt')) {
 }
 
 /* 结果页标签切换：一次只显示一块，避免长条滚动与空白栏 */
-let TAB = 'compare';
 function showTab(key) {
   TAB = key || 'compare';
   const bar = $('resTabs');
@@ -3405,7 +3444,6 @@ renderPlans = function (res) {
 /* =====================================================================
  * 三视图 / 3D 预览（Three.js，懒加载：只有用户展开该卡片才初始化 WebGL）
  * =================================================================== */
-let VD = null, VD_LAYOUT = 'quad';
 function vdGeometry() {
   if (!S.result) return null;
   const plan = S.result.top3[S.selected].plan;
@@ -3479,7 +3517,6 @@ function markVd() {
 /* =====================================================================
  * 器件清单与 BOM
  * =================================================================== */
-let CUR_BOM = null;
 function renderBom() {
   const card = $('cardBom'), box = $('bomBody');
   if (!S.result) { card.style.display = 'none'; return; }
@@ -3620,7 +3657,7 @@ $('btnFuseSvg').onclick = function () {
 function updateStepBar() {
   const bar = $('stepBar');
   if (!bar) return;
-  const n = Object.keys(S.anchors).length;
+  const n = realAnchorKeys().length;
   const done = [true, n >= 2, !!S.result, !!S.result, !!S.result];
   bar.querySelectorAll('.st').forEach(function (el) {
     const s = Number(el.dataset.s);
@@ -3649,7 +3686,6 @@ if (window.matchMedia && window.matchMedia('(max-width:900px)').matches) {
 /* =====================================================================
  * PWA：注册 Service Worker + 更新提示
  * =================================================================== */
-let SW_REG = null, SW_WAITING = null;
 function showUpdateBar() {
   const bar = $('swUpdate');
   if (bar) bar.classList.add('on');
