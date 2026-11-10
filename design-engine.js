@@ -534,7 +534,7 @@
     Object.keys(type.anchors).forEach(function (k) {
       const a = ANCHOR_BY_ID[k];
       values[k] = a ? clamp(type.anchors[k], a.min, a.max) : type.anchors[k];
-      src[k] = 'baseline';
+      src[k] = 'template';
     });
     // 2) 用户锚点覆盖（并按锚点定义夹取）
     Object.keys(anchors || {}).forEach(function (k) {
@@ -543,7 +543,7 @@
       const v = num(anchors[k]);
       if (v === null) return;
       values[k] = clamp(v, a.min, a.max);
-      src[k] = userKeys[k] ? 'anchor' : 'baseline';
+      src[k] = userKeys[k] ? 'anchor' : 'template';
     });
 
     const clampAr = function (v) { return R.ar && R.ar[1] > 0 ? clamp(v, R.ar[0], R.ar[1]) : v; };
@@ -552,55 +552,58 @@
     const isAnchor = function (k) { return src[k] === 'anchor'; };
 
     /* ---------------- 纯输入模式（raw）----------------
-     * 用户关掉「引擎推荐」时启用：只做「机型模板打底 + 用户锚点原样覆盖」，
-     * 不做任何联动推导（area⇄mass⇄wl、span⇄ar 等一概不互推）。
-     * 因此用户给的锚点若与机型模板的物理关系对不上，会如实暴露出来：
-     * 锚点一致性下降 → 总分按 (0.75 + 0.25×一致性) 折减，
-     * 同一套锚点在纯输入模式下的得分明显低于引擎补全模式。
-     * ⚠ 必须放在通用兜底之前，否则兜底会用「用户给的翼载」补面积，等于偷偷满足了锚点。
+     * 用户关掉「引擎推荐」时启用：**不做候选搜索、不做多目标择优**，
+     * 但仍然要把「用户没给的值」按物理关系算出来。
+     *
+     * 早期实现是在这里直接 return，把面积/翼展钉在机型模板上：
+     *   起飞 4 kg + 翼载 80 g/dm² → 面积仍给模板的 0.2667 m²、翼展仍 1.200 m
+     * 结果是「纯输入」模式实际上忽略了输入，用户改重量/翼载对尺寸毫无影响。
+     * 现在的做法：
+     *   ① 机型模板只在「物理上确实欠定」的项上兜底，并标 src='template'；
+     *   ② 面积 / 翼展不预设模板值，交给下面的通用推导链
+     *      （几何 area⇄span⇄ar⇄chord、重量 mass⇄wl⇄area）；
+     *   ③ 只有真正缺少必要输入时才回落到模板，界面可据此区分
+     *      「你指定 / 算出来 / 模板假设」。
+     * 与引擎补全模式的差别因此变成「有没有搜索与择优」，而不是「算不算」。
      */
     if (raw) {
       const tplA = type.anchors || {};
-      if (!isFinite(values.area)) {
-        const wlRef = isFinite(tplA.wl) ? tplA.wl : 45;
-        const mRef = isFinite(tplA.mass) ? tplA.mass : values.mass;
-        values.area = (isFinite(mRef) && isFinite(wlRef) && wlRef > 0) ? (mRef * 10) / wlRef : 0.25;
-        src.area = 'baseline';
-      }
-      if (!isFinite(values.span)) {
-        const arRef = isFinite(tplA.ar) ? tplA.ar : 6;
-        values.span = Math.sqrt(Math.max(0.001, values.area) * arRef);
-        src.span = 'baseline';
-      }
-      if (!isFinite(values.taper)) { values.taper = 0.7; src.taper = 'baseline'; }
-      if (!isFinite(values.mass)) { values.mass = isFinite(tplA.mass) ? tplA.mass : 1.2; src.mass = 'baseline'; }
-      if (!isFinite(values.prop)) { values.prop = 10; src.prop = 'baseline'; }
-      if (!isFinite(values.kv)) { values.kv = 1000; src.kv = 'baseline'; }
-      if (!isFinite(values.voltage)) { values.voltage = 11.1; src.voltage = 'baseline'; }
-      if (!isFinite(values.capa)) { values.capa = 3000; src.capa = 'baseline'; }
-      if (!isFinite(values.payload)) { values.payload = 0; src.payload = 'baseline'; }
-      values.area = clamp(values.area, 0.01, 3.0);
-      values.span = clamp(values.span, 0.15, 6.0);
-      values.mass = clamp(values.mass, 0.03, 20);
-      return { values: values, source: src, raw: true };
+      Object.keys(tplA).forEach(function (k) {
+        if (!isFinite(values[k])) values[k] = tplA[k];
+        if (src[k] !== 'anchor') src[k] = 'template';
+      });
+      // 面积与翼展必须由锚点推导，不能被模板预占
+      if (!isAnchor('area')) { values.area = NaN; src.area = 'derived'; }
+      if (!isAnchor('span')) { values.span = NaN; src.span = 'derived'; }
+      if (!isAnchor('mass')) { /* mass 交给推导链由 wl/area 反算，算不出才用模板 */ }
+      if (!isFinite(values.taper)) { values.taper = 0.7; }
+      if (!isFinite(values.payload)) { values.payload = 0; }
+      // 不 return：继续走通用推导链
     }
 
-    // 3) 模板可能未声明 area / taper，这里用规则补齐基线，避免后续出现 NaN
+    // 3) 面积：优先由「重量 ÷ 翼载」算出；两者都缺才落到 0.25 m² 兜底
     if (!isFinite(values.area)) {
-      values.area = isFinite(values.mass) && isFinite(values.wl) ? (values.mass * 10) / values.wl : 0.25;
-      src.area = 'baseline';
+      if (isFinite(values.mass) && isFinite(values.wl) && values.wl > 0) {
+        values.area = (values.mass * 10) / values.wl;
+        src.area = 'derived';
+      } else {
+        values.area = 0.25;
+        src.area = 'template';
+      }
     }
+    // 翼展：由「面积 × 展弦比」算出；展弦比缺失才用模板/经验值 6
     if (!isFinite(values.span)) {
-      const arRef = isFinite(values.ar) && values.ar > 0 ? values.ar : 6;
+      const arGiven = isFinite(values.ar) && values.ar > 0;
+      const arRef = arGiven ? values.ar : 6;
       values.span = Math.sqrt(Math.max(0.001, values.area) * arRef);
-      src.span = 'baseline';
+      src.span = arGiven ? 'derived' : 'template';
     }
-    if (!isFinite(values.taper)) { values.taper = 0.7; src.taper = 'baseline'; }
-    if (!isFinite(values.prop)) { values.prop = 10; src.prop = 'baseline'; }
-    if (!isFinite(values.kv)) { values.kv = 1000; src.kv = 'baseline'; }
-    if (!isFinite(values.voltage)) { values.voltage = 11.1; src.voltage = 'baseline'; }
-    if (!isFinite(values.capa)) { values.capa = 3000; src.capa = 'baseline'; }
-    if (!isFinite(values.payload)) { values.payload = 0; src.payload = 'baseline'; }
+    if (!isFinite(values.taper)) { values.taper = 0.7; src.taper = 'template'; }
+    if (!isFinite(values.prop)) { values.prop = 10; src.prop = 'template'; }
+    if (!isFinite(values.kv)) { values.kv = 1000; src.kv = 'template'; }
+    if (!isFinite(values.voltage)) { values.voltage = 11.1; src.voltage = 'template'; }
+    if (!isFinite(values.capa)) { values.capa = 3000; src.capa = 'template'; }
+    if (!isFinite(values.payload)) { values.payload = 0; src.payload = 'template'; }
 
     // 3) 几何组：展示/计算所需的翼展与翼面积必须优先确定下来
     if (isAnchor('area')) {
@@ -646,7 +649,9 @@
 
     // 5b) 关键一致性修正：翼展与翼面积确定后，派生出的展弦比必须落在该机型合理区间内。
     //     否则会出现 AR=60 这类荒谬结果（例如滑翔机翼展 2 m 但只装 100 g）。
-    if (R.ar && R.ar[1] > 0 && !isAnchor('ar')) {
+    // 若用户同时锚定翼展与弦长，面积与展弦比都已被唯一确定，不得再"修正"，
+    // 否则会悄悄覆盖弦长锚点；此时把偏离交给三级校验以「警告」形式呈现。
+    if (R.ar && R.ar[1] > 0 && !isAnchor('ar') && !(isAnchor('span') && isAnchor('chord'))) {
       const arNow = (values.span * values.span) / values.area;
       if (arNow < R.ar[0] * 0.92 || arNow > R.ar[1] * 1.08) {
         const arUse = arNow < R.ar[0] ? R.ar[0] : R.ar[1];
