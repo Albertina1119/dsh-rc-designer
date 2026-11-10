@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '1.7.0';
+  const VERSION = '1.8.0';
   const SCHEMA = 'dsh-project@1';
   const STORE_KEY = 'dsh.rcDesigner.v1';
 
@@ -532,6 +532,16 @@
    * 8. Changelog
    * =================================================================== */
   const CHANGELOG = [
+    {
+      version: '1.8.0', date: '2026-10-15',
+      highlights: [
+        '纯输入模式修正：未勾选引擎推荐值时，没给的参数改由已给锚点按物理公式算出，不再直接抄机型模板',
+        '面积 = 重量×10÷翼载、翼展 = √(面积×展弦比)、面积 = 翼展×弦长；推重比×重量 → 所需推力 → 桨径/电机',
+        '参数表新增来源徽标：你（锚点）/ 算（推导）/ 模（模板假设），并在总体页汇总三项数量',
+        '修正同时给翼展+弦长时，展弦比一致性校正会悄悄覆盖弦长锚点的问题',
+        'source 标记由 baseline 细化为 anchor / derived / template'
+      ]
+    },
     {
       version: '1.7.0', date: '2026-10-15',
       highlights: [
