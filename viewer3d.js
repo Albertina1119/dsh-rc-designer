@@ -39,10 +39,14 @@
     const root = num(pf.root, 0.24);
     const tip = num(pf.tip, root * 0.7);
     const fusL = isFinite(m['机身总长']) ? m['机身总长'] / 1000 : num(c.fuselageLength, 0.9);
-    const tailSpan = num(c.tailSpanH, span * 0.36);
-    const tailChord = num(c.tailChordH, root * 0.6);
-    const finH = isFinite(m['垂尾高度']) ? m['垂尾高度'] / 1000 : root * 1.5;
-    const finRoot = isFinite(m['垂尾根弦']) ? m['垂尾根弦'] / 1000 : tailChord * 1.1;
+    // 尾翼几何直接读 core.tail（与建模参数 / Excel 同源，避免按中文名查找）
+    const tl = t || {};
+    const tailSpan = num(tl.spanH, num(c.tailSpanH, span * 0.36));
+    const tailChord = num(tl.rootChordH, num(c.tailChordH, root * 0.6));
+    const tailTip = num(tl.tipChordH, tailChord * 0.8);
+    const finH = num(tl.spanV, root * 1.5);
+    const finRoot = num(tl.rootChordV, num(c.tailChordH, root * 0.6) * 1.1);
+    const finTip = num(tl.tipChordV, finRoot * 0.75);
     const dihedral = num(c.dihedral, 0) * Math.PI / 180;
     const sweep = num(c.sweep, 0) * Math.PI / 180;
 
