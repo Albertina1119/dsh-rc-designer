@@ -727,6 +727,7 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
   <div class="hstat">
     <div>候选方案 <b id="hsCand">—</b></div>
     <div>可行 <b id="hsFeas">—</b></div>
+      <div>零警告 <b id="hsClean">—</b></div>
     <div>置信度 <b id="hsConf">—</b></div>
   </div>
   <div class="btnrow">
@@ -1669,6 +1670,9 @@ function doPlan() {
   renderAnchors();
   $('hsCand').textContent = res.candidatesEvaluated;
   $('hsFeas').textContent = res.feasibleCount;
+  // 「可行」在有候选的情况下几乎恒为 100%（引擎会主动把参数修正进区间），
+  // 单看它没有信息量；「零警告」才反映候选里有多少套完全落在经验区间内。
+  if ($('hsClean')) $('hsClean').textContent = (res.cleanCount != null ? res.cleanCount : '—');
   $('hsConf').textContent = res.top3[0].plan.confidence + '%';
   $('planType').textContent = res.typeName;
   $('paramHint').textContent = '可锁定后重推';
@@ -3109,7 +3113,9 @@ function showStage(which) {
       const c = t.plan.core;
       $('resSub').textContent = '得分 ' + t.plan.score.total + ' / 100　·　起飞重量 ' +
         (isFinite(c.mass) ? c.mass.toFixed(2) : '—') + ' kg　·　翼载 ' +
-        (isFinite(c.wlGdm2) ? c.wlGdm2.toFixed(0) : '—') + ' g/dm²　·　' + (S.result.mode === 'raw' ? '纯输入模式' : '引擎补全模式');
+        (isFinite(c.wlGdm2) ? c.wlGdm2.toFixed(0) : '—') + ' g/dm²　·　' + (S.result.mode === 'raw' ? '纯输入模式' : '引擎补全模式') +
+        '　·　候选 ' + S.result.candidatesEvaluated + ' / 可行 ' + S.result.feasibleCount +
+        ' / 零警告 ' + (S.result.cleanCount != null ? S.result.cleanCount : '—');
     }
   }
   updateStepBar();
