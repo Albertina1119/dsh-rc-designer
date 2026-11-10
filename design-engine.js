@@ -759,10 +759,22 @@
     //       + lh（重心到平尾焦点的尾臂） + c_t（平尾平均弦长）
     // 并以「机身长度 / 翼展」比值对照该机型的经验区间做合理性校验。
     let fuselageLength = NaN, fusRatio = NaN, tailChordH = NaN, tailSpanH = NaN;
+    // 尾翼完整几何：面积 → 翼展 → 根弦/尖弦 → 展弦比
+    //   平尾：展弦比按主翼 0.55 折减（clamp 2.5~6.0），梢根比 0.80
+    //   垂尾：展弦比 1.40（面积/高度关系），梢根比 0.75
+    // 这几个常数同时被 Inventor 建模参数、Excel 与 3D 预览引用，
+    // 集中在核心计算里定义，避免下游各自算一套互相打架。
+    const AR_TAIL_H = clamp(AR * 0.55, 2.5, 6.0);
+    const TAPER_H = 0.80, TAPER_V = 0.75, AR_TAIL_V = 1.40;
+    let tailRootH = NaN, tailTipH = NaN, tailSpanV = NaN, tailRootV = NaN, tailTipV = NaN;
     if (!o.rotary) {
-      const arTailH = clamp(AR * 0.55, 2.5, 6.0);
-      tailSpanH = Math.sqrt(Math.max(0.001, Sh) * arTailH);
+      tailSpanH = Math.sqrt(Math.max(0.001, Sh) * AR_TAIL_H);
       tailChordH = tailSpanH > 0 ? Sh / tailSpanH : NaN;
+      tailRootH = tailSpanH > 0 ? (2 * Sh) / (tailSpanH * (1 + TAPER_H)) : NaN;
+      tailTipH = isFinite(tailRootH) ? tailRootH * TAPER_H : NaN;
+      tailSpanV = Math.sqrt(Math.max(0.001, Sv) * AR_TAIL_V);
+      tailRootV = tailSpanV > 0 ? (2 * Sv) / (tailSpanV * (1 + TAPER_V)) : NaN;
+      tailTipV = isFinite(tailRootV) ? tailRootV * TAPER_V : NaN;
       fuselageLength = 0.35 * pf.root + cgPct * pf.root + lh + tailChordH;
       fusRatio = fuselageLength / b;
     }
@@ -1043,7 +1055,17 @@
       cd0: cd0, oswald: e, kInduced: k, clMd, ldMax: ldMax, vMd: vMd, swet: Swet,
       tail: {
         lh: lh, lv: lv, Sh: Sh, Sv: Sv, vh: vh, vv: vv,
-        elevRatio: 0.40, rudderRatio: 0.38, aileronRatio: clamp(0.28 - (type.id === '3d' ? 0.06 : 0), 0.18, 0.35)
+        elevRatio: 0.40, rudderRatio: 0.38, aileronRatio: clamp(0.28 - (type.id === '3d' ? 0.06 : 0), 0.18, 0.35),
+        // ---- 平尾几何 ----
+        spanH: tailSpanH, chordH: tailChordH, rootChordH: tailRootH, tipChordH: tailTipH,
+        arH: (isFinite(tailSpanH) && isFinite(tailChordH) && tailChordH > 0) ? tailSpanH / tailChordH : NaN,
+        taperH: TAPER_H,
+        // ---- 垂尾几何 ----
+        spanV: tailSpanV, chordV: tailRootV, rootChordV: tailRootV, tipChordV: tailTipV,
+        arV: AR_TAIL_V, taperV: TAPER_V,
+        // ---- 舵面弦长（绝对长度）----
+        elevatorChord: (isFinite(tailRootH) ? 0.40 * tailRootH : NaN),
+        rudderChord: (isFinite(tailRootV) ? 0.38 * tailRootV : NaN)
       },
       cg: { mac: mac, acPct: acPct, cgPct: cgPct, acMM: acMM, cgMM: cgMM, staticMargin: staticMargin, thrustLine: '-2° (相对翼弦)' },      power: power, rotary: rotary,
       perf: {
@@ -1057,7 +1079,23 @@
         ribSpacing: ribSpacing, materials: materials,
         servoAileron: servoAileron, servoElevator: servoElevator, servoRudder: servoRudder,
         safetyFactor: 1.5
-      }
+      },
+      material: materialRecommendation({
+        planform: pf, ar: AR, span: b, area: S, taper: lambda, meanChord: pf.meanChord,
+        mass: m, wlGdm2: wl, vStall: vStall, rotary: rotary,
+        perf: { vMaxCalc: vMaxCalc },
+        tail: {
+          lh: lh, lv: lv, Sh: Sh, Sv: Sv, vh: vh, vv: vv,
+          spanH: tailSpanH, chordH: tailChordH, rootChordH: tailRootH, tipChordH: tailTipH,
+          spanV: tailSpanV, chordV: tailRootV, rootChordV: tailRootV, tipChordV: tailTipV,
+          arH: (isFinite(tailSpanH) && isFinite(tailChordH) && tailChordH > 0) ? tailSpanH / tailChordH : NaN,
+          arV: AR_TAIL_V, taperH: TAPER_H, taperV: TAPER_V
+        },
+        structure: {
+          nLimit: nLimit, rootMoment: rootMoment, sparDiaMM: sparDiaMM,
+          ribSpacing: ribSpacing, materials: materials, safetyFactor: 1.5
+        }
+      }, type)
     };
   }
 
@@ -1624,6 +1662,354 @@
   }
 
   /* =======================================================================
+   * 12b. 制造材料推荐（按用途）
+   *
+   * 需求：根据飞机用途推荐机翼制造材料（载重机 / 竞速机…各不同），
+   *       并给出平尾、垂尾的翼展、弦长与材质。
+   *
+   * 设计原则：
+   *   · 先按机型给「主推方案」（primary），这是该用途下最主流、性价比最高的做法；
+   *   · 再按计算出的展弦比 / 翼根弯矩 / 最大速度追加「修正建议」（modifiers），
+   *     因为同一用途下大展弦比或高过载会改变结构选型；
+   *   · 同时给 2 条「备选方案」（alternatives）说明什么情况下换它、代价是什么；
+   *   · 给 1~2 条「不推荐」（avoid），避免新手踩坑。
+   *
+   * 难度 / 成本 / 重量三档：低 / 中 / 高。
+   * ===================================================================== */
+  const WING_MATERIAL_PROFILES = {
+    trainer: {
+      primary: '轻木（Balsa）构架 + 轻木翼肋 + 热缩膜蒙皮',
+      structure: '轻木 D-box 前缘盒 + 轻木翼肋 + 碳管主梁 + 热缩膜后段',
+      spar: '碳纤维圆管 φ6~8 mm（也可用桦木主梁，成本更低）',
+      skin: '前缘轻木蒙皮 + 后段热缩膜；拼色直接贴在膜上',
+      ribs: '轻木 2~3 mm，间距 90~110 mm',
+      process: '激光切翼肋 → 木质胶接 → 热缩膜熨烫（常温，无需烘箱）',
+      difficulty: '低', cost: '低', weight: '中',
+      reasons: [
+        '练习机翼载低（约 40~50 g/dm²），翼根弯矩小，不需要复材承力',
+        '轻木自重轻、易切割、摔坏后单片可换，返修成本几乎为零',
+        '热缩膜可反复熨烫修形，是练习机最经济的蒙皮方案'
+      ],
+      alternatives: [
+        { name: 'EPP / EPO 泡沫整体成型', when: '首飞阶段、预计频繁摔机', tradeoff: '耐摔性最好，但刚度低，高速会翼面颤振' },
+        { name: '3 mm DTFB 泡沫板 + 纤维胶带', when: '1 m 以内超轻练习机', tradeoff: '成本最低、制作最快，寿命与气动精度较差' }
+      ],
+      avoid: ['全碳纤维蒙皮（对练习机过重、过贵，且摔后无法局部修补）', '蜂窝夹芯（局部破损会扩散，返修困难）']
+    },
+    glider: {
+      primary: '碳纤维主梁 + 玻璃纤维（玻纤）蒙皮 + 巴尔沙夹芯',
+      structure: '碳管/碳扁梁承弯 + 玻纤布蒙皮承扭 + 巴尔沙或 Rohacell 夹芯',
+      spar: '碳纤维扁梁（上下面各一条）或碳管 φ8~12 mm，大展弦比需双梁',
+      skin: '1~2 层 25~50 g/m² 玻纤布 + 环氧，真空袋压',
+      ribs: '巴尔沙 2 mm 或 Rohacell 3 mm，间距 120~150 mm（夹芯可不用肋）',
+      process: '阴模/阳模铺层 + 真空袋压 + 常温或 60 ℃ 固化',
+      difficulty: '中', cost: '中', weight: '轻',
+      reasons: [
+        '滑翔机靠升阻比取胜，翼面必须高精度、低粗糙度，玻纤蒙皮比热缩膜平整得多',
+        '展弦比 9~12 时翼根弯矩大而结构高度小，必须用碳梁承担弯矩',
+        '玻纤承扭 + 碳梁承弯是「材料各司其职」的经典组合，比全碳便宜很多且不易脆断'
+      ],
+      alternatives: [
+        { name: '全碳纤维 + 蜂窝夹芯', when: 'F3F/F3B 竞赛级、需要极限刚度', tradeoff: '刚度最高，但价格高、脆性大、局部损伤难修' },
+        { name: '轻木 + 热缩膜（传统构架）', when: '2 m 以内休闲滑翔、预算有限', tradeoff: '便宜易修，但翼面精度与刚度不足，高速会损失升阻比' }
+      ],
+      avoid: ['纯热缩膜蒙皮配大展弦比（膜会随温度松弛，翼型失真）', '单根细碳管配超长翼展（扭转刚度不够，易发生副翼反效）']
+    },
+    '3d': {
+      primary: '巴尔沙（Balsa）构架 + 轻木翼肋 + 热缩膜蒙皮',
+      structure: '巴尔沙 D-box + 轻木翼肋 + 碳管主梁 + 热缩膜；副翼段加固',
+      spar: '碳纤维管 φ8~10 mm 或碳扁梁，副翼铰链线加碳条',
+      skin: '热缩膜（低收缩型），铰链处贴纤维胶带',
+      ribs: '轻木 2.5 mm，间距 70~90 mm（3D 机动载荷大，肋要密）',
+      process: '激光切翼肋 → 木质胶接 → 热缩膜；副翼需单独做铰链梁',
+      difficulty: '中', cost: '低', weight: '轻',
+      reasons: [
+        '3D 机要求「轻 + 大舵面 + 高刚度」，巴尔沙构架在同等重量下比泡沫刚得多',
+        '推重比接近 2、舵面偏转大，翼面扭转刚度必须靠密肋 + 碳梁保证',
+        '热缩膜重量最轻且可局部补强，是 3D 机的标准蒙皮'
+      ],
+      alternatives: [
+        { name: 'EPP 泡沫 + 碳片加强', when: '低空 3D 练习、经常撞地', tradeoff: '极耐摔，但重量偏大、翼面精度差' },
+        { name: '玻纤蒙皮 + 泡沫夹芯', when: '大尺寸 3D（>1.6 m）', tradeoff: '刚度更好，但重量增加，低速 3D 动作会变迟钝' }
+      ],
+      avoid: ['大面积蜂窝夹芯（重量分布靠外，转动惯量大，3D 动作变慢）', '纯泡沫无加强（大舵面偏转时翼面会扭曲）']
+    },
+    racer: {
+      primary: '碳纤维 / 凯夫拉复合 + PMI 泡沫夹芯（或玻纤-碳混铺）',
+      structure: '碳纤维上下蒙皮 + 泡沫夹芯承弯，凯夫拉用于抗冲击部位（前缘、翼尖）',
+      spar: '碳纤维单向带（UD）做上下翼梁帽 + 碳布腹板，形成工字梁',
+      skin: '1K/3K 碳布 + 环氧，前缘加 1 层凯夫拉防撞',
+      ribs: '夹芯结构无需密集翼肋，仅在舵面铰链与主梁处设加强肋',
+      process: '阴模铺层 + 真空袋压 + 中温固化（80~120 ℃）',
+      difficulty: '高', cost: '高', weight: '轻',
+      reasons: [
+        '竞速机翼载高、速度 40 m/s 以上，动压与翼根弯矩都是练习机的数倍，必须复材承力',
+        '碳纤维比刚度最高，同样刚度下最轻；凯夫拉抗冲击，放在前缘可避免小石子打穿',
+        '夹芯结构把蒙皮推到翼型最外侧，抗弯效率最高，同时保持翼面精度'
+      ],
+      alternatives: [
+        { name: '玻纤 + 碳梁（半复材）', when: '入门竞速、预算有限', tradeoff: '成本降一半，但刚度与重量不如全碳，极速会略低' },
+        { name: '轻木构架 + 碳梁 + 热缩膜', when: '5 寸级小型竞速机', tradeoff: '制作快、易修，但高速时膜会鼓起，翼型失真' }
+      ],
+      avoid: ['纯玻璃纤维蒙皮配大展弦比（刚度不足，高速副翼反效）', '木材主梁（竞速载荷下会疲劳开裂）']
+    },
+    cargo: {
+      primary: '泡沫夹芯 + 碳管桁架 + 玻纤蒙皮（局部碳加强）',
+      structure: 'EPS/XPS 泡沫夹芯 + 碳管前后梁 + 玻纤蒙皮；机身用碳管/木桁架',
+      spar: '前后双碳管 φ10~14 mm 或碳扁梁，载荷集中在翼根需加加强肋',
+      skin: '玻纤布 + 环氧；机翼上表面局部加碳布提高承压能力',
+      ribs: '轻木/胶合板 3 mm 加强肋（仅在挂点、起落架、翼根处）',
+      process: '泡沫热切割 → 碳管埋入 → 玻纤手糊/真空袋压',
+      difficulty: '中', cost: '中', weight: '中',
+      reasons: [
+        '载重机需要「大内部容积 + 高承弯能力」，泡沫夹芯最便宜地提供厚度与抗弯惯性矩',
+        '有效载荷集中在机身/翼下挂点，必须在挂点做加强肋，把集中力扩散到主梁',
+        '玻纤蒙皮韧性好，起降擦碰不易像碳纤那样脆裂'
+      ],
+      alternatives: [
+        { name: '全碳纤维 + 蜂窝夹芯', when: '载荷 > 2 kg、需要极限减重', tradeoff: '最轻最强，但成本高、修复困难' },
+        { name: '轻木 + 玻纤蒙皮（传统构架）', when: '小批量自制、载荷 < 1 kg', tradeoff: '便宜好修，但内部容积小、承弯能力有限' }
+      ],
+      avoid: ['纯泡沫无梁（挂载后翼根会直接折断）', '单根细碳管（前后梁间距不足时抗扭差，机翼会扭转）']
+    },
+    endurance: {
+      primary: '碳管主梁 + 泡沫/玻纤蒙皮',
+      structure: '单/双碳管主梁 + XPS 泡沫夹芯 + 玻纤蒙皮；长翼展需分段对接',
+      spar: '碳纤维圆管 φ8~12 mm，分段处用碳管插接 + 玻纤缠绕加强',
+      skin: '25~50 g/m² 玻纤布 + 环氧，翼面打磨到 Ra 1.6 以下',
+      ribs: '轻木 2 mm，间距 120~160 mm',
+      process: '泡沫热切割 + 碳管埋入 + 玻纤真空袋压',
+      difficulty: '中', cost: '中', weight: '轻',
+      reasons: [
+        '长航时的关键是升阻比，翼面必须平整光滑，玻纤蒙皮优于热缩膜',
+        '长翼展带来大翼根弯矩，碳管主梁是最轻的承弯方案',
+        '分段对接便于运输，插接处缠绕玻纤可恢复 80% 以上刚度'
+      ],
+      alternatives: [
+        { name: '全碳 + Rohacell 夹芯', when: '目标续航 > 60 min 的竞赛级', tradeoff: '刚度与精度最好，但成本高' },
+        { name: '轻木构架 + 热缩膜', when: '1.5 m 以内休闲长航时', tradeoff: '便宜易修，翼面精度略差' }
+      ],
+      avoid: ['过薄的单层玻纤蒙皮（易出现局部凹陷，破坏层流）', '翼尖不加轻质结构（翼尖颤振会累积成翼面疲劳）']
+    },
+    edf: {
+      primary: '轻木构架 + 玻璃纤维蒙皮（涵道筒用碳纤/玻纤缠绕）',
+      structure: '轻木/胶合板构架 + 玻纤蒙皮；进气口与涵道筒单独做承力件',
+      spar: '碳管主梁 φ8~10 mm，涵道安装框用 3 mm 胶合板 + 玻纤加强',
+      skin: '玻纤布 + 环氧，进气唇口用碳布加强并倒圆',
+      ribs: '轻木 2.5 mm，间距 80~100 mm',
+      process: '木质构架胶接 + 玻纤蒙皮；涵道筒可买成品或用玻纤缠绕自制',
+      difficulty: '中', cost: '中', weight: '中',
+      reasons: [
+        '涵道机的推力来自高速射流，进气唇口形状与内壁光滑度直接决定推力，木构架 + 玻纤最容易做出光滑内壁',
+        '涵道筒是独立承力件，需与机身框可靠连接，否则振动会导致开裂',
+        '翼载约 90~110 g/dm²，翼根弯矩中等，碳管单梁足够'
+      ],
+      alternatives: [
+        { name: 'EPO 泡沫整机成型', when: '量产型 EDF 像真机', tradeoff: '一致性好、制作快，但刚度低，高速会翼面颤振' },
+        { name: '全玻纤阴模成型', when: '需要高表面质量与强度', tradeoff: '外观与强度最好，但模具成本高' }
+      ],
+      avoid: ['涵道筒用薄热缩膜/纸筒（高速气流会吸瘪）', '进气口直角（会产生严重分离，推力损失 20% 以上）']
+    },
+    jet: {
+      primary: '碳纤维 + 玻璃纤维复合，蜂窝/泡沫夹芯承力（耐高温区用玻纤+隔热层）',
+      structure: '碳布/碳带蒙皮 + 蜂窝或 PMI 夹芯；排气段用玻纤 + 隔热棉',
+      spar: '碳纤维工字梁（上下翼梁帽 + 腹板），翼根与起落架框整体加强',
+      skin: '碳布 + 环氧（中温固化）；高温区改用玻纤或加铝箔隔热',
+      ribs: '夹芯结构，仅在翼根、起落架、舵面铰链处设加强肋',
+      process: '阴模铺层 + 真空袋压 + 中温固化；关键接头二次胶接 + 螺栓',
+      difficulty: '高', cost: '高', weight: '轻',
+      reasons: [
+        '涡喷机型翼载 140 g/dm² 以上、速度 60 m/s 量级，结构必须按高动压与疲劳设计',
+        '涡喷排气温度可达 600~700 ℃，普通碳纤环氧会软化，必须用玻纤 + 隔热层隔离',
+        '起落架冲击载荷要经加强框传到主梁，接头是全线最薄弱环节，需螺栓 + 胶接双保险'
+      ],
+      alternatives: [
+        { name: '玻纤 + 碳梁（半复材）', when: '入门涡喷、速度 < 50 m/s', tradeoff: '成本低、耐热性更好，但刚度与重量不如全碳' },
+        { name: '木质构架 + 玻纤蒙皮', when: '小型涡喷（<3 kg 推力）', tradeoff: '制作简单，但疲劳寿命短，不适合长期高频飞行' }
+      ],
+      avoid: ['碳纤维直接暴露在排气段（高温 + 氧化会迅速失效）', '环氧胶接承力接头（长期振动会脱胶，必须机械紧固辅助）']
+    },
+    multirotor: {
+      primary: '碳纤维机架板（3K 碳板）+ 铝合金柱 + 碳管机臂',
+      structure: '上下碳板夹层 + 铝柱支撑；机臂用碳管或碳板一体切割',
+      spar: '机臂碳管 φ16~25 mm（按轴距与桨径定）',
+      skin: '不适用（多旋翼无机翼蒙皮），电池仓可用玻纤/PC 壳保护',
+      ribs: '不适用',
+      process: 'CNC 切割碳板 + 铝柱螺栓连接；碳板边缘需封边防分层',
+      difficulty: '中', cost: '中', weight: '轻',
+      reasons: [
+        '多旋翼的载荷是「电机振动 + 起降冲击」，碳板抗弯刚度高、加工方便，是行业标准',
+        '机臂用碳管可在最小重量下获得最大抗弯刚度，撞机时优先断臂而非断机架',
+        '铝柱提供层间高度与紧固点，比整体碳件更易维修'
+      ],
+      alternatives: [
+        { name: '玻纤板机架', when: '练习机、预算有限', tradeoff: '便宜、韧性好不易断，但刚度与重量不如碳板' },
+        { name: '注塑/PC 一体壳', when: '消费级航拍机', tradeoff: '外观好、抗摔，但重且不易维修' }
+      ],
+      avoid: ['纯 3D 打印 PLA 机架（刚度低、高温软化、振动下会开裂）', '碳板与铝直接接触不加绝缘（碳导电，会短路）']
+    },
+    heli: {
+      primary: '碳纤维机身侧板 + 铝合金传动件 + 玻纤头罩',
+      structure: '2.0~2.5 mm 碳板侧板 + 铝柱/铝框构成受力框架；主轴/尾管为铝或碳',
+      spar: '不适用（旋翼机型），主旋翼用碳纤/玻纤桨',
+      skin: '头罩用玻纤或 PETG 吸塑，仅整流不承力',
+      ribs: '不适用',
+      process: 'CNC 切碳板 + 铝件车削 + 螺栓装配',
+      difficulty: '高', cost: '高', weight: '中',
+      reasons: [
+        '直升机的主受力是主旋翼传来的交变弯矩与扭矩，碳板侧板 + 铝框是最成熟的框架方案',
+        '传动系统需要高精度与耐磨，铝件比复材更合适',
+        '头罩只整流不承力，玻纤/吸塑即可，损坏后可单独更换'
+      ],
+      alternatives: [
+        { name: '全铝机身', when: '老旧机型或大级别', tradeoff: '维修方便，但重量大、振动传递明显' },
+        { name: '玻纤侧板', when: '练习机型', tradeoff: '韧性好、便宜，但刚度不足，大桨会共振' }
+      ],
+      avoid: ['碳板与金属件直接螺栓连接不加垫片（会压溃碳板孔边）', '省掉主旋翼动平衡（振动会加速所有结构疲劳）']
+    }
+  };
+
+  /* 尾翼材料：按尾翼载荷等级分三档 */
+  const TAIL_MATERIAL_PROFILES = {
+    light: {
+      material: '轻木构架 + 轻木翼肋 + 热缩膜蒙皮',
+      structure: '轻木 D-box 前缘 + 轻木翼肋 + 碳管或桦木梁 + 热缩膜',
+      reason: '尾翼面积小、载荷低，轻木构架在同等刚度下最轻且易修补',
+      difficulty: '低', cost: '低'
+    },
+    stiff: {
+      material: '巴尔沙实心（或轻木 + 碳条加强）+ 热缩膜 / 玻纤蒙皮',
+      structure: '巴尔沙实心板削形 + 碳条贴铰链线 + 热缩膜；或轻木框 + 玻纤蒙皮',
+      reason: '大舵面高速度下尾翼会颤振，实心巴尔沙 + 碳条能以最小重量获得足够扭转刚度',
+      difficulty: '中', cost: '低'
+    },
+    comp: {
+      material: '碳纤维/玻纤复合 + 泡沫夹芯（或全玻纤阴模件）',
+      structure: '上下碳布蒙皮 + 泡沫夹芯 + 碳梁；铰链处预埋碳条或铝管',
+      reason: '高速机型尾翼动压高，且涡喷排气会烘烤结构，复材 + 夹芯兼顾刚度与耐温',
+      difficulty: '高', cost: '高'
+    }
+  };
+
+  /**
+   * 推荐制造材料（机翼 + 平尾 + 垂尾）
+   * @returns {object} { wing, tail:{ h, v, cls }, modifiers[], summary, isRotary }
+   */
+  function materialRecommendation(core, type) {
+    const t = type || {};
+    const c = core || {};
+    const st = c.structure || {};
+    const isRotary = !!c.rotary;
+    const prof = WING_MATERIAL_PROFILES[t.id] || WING_MATERIAL_PROFILES.trainer;
+
+    /* ---- 修正建议：同一用途下，展弦比 / 弯矩 / 速度会改变结构选型 ---- */
+    const modifiers = [];
+    const ar = isFinite(c.ar) ? c.ar : 6;
+    const moment = isFinite(st.rootMoment) ? st.rootMoment : 0;
+    const vmax = c.perf && isFinite(c.perf.vMaxCalc) ? c.perf.vMaxCalc : 0;
+    const span = isFinite(c.span) ? c.span : 1.2;
+
+    if (!isRotary) {
+      if (ar >= 10) {
+        modifiers.push({
+          level: 'warn', key: '大展弦比',
+          note: '展弦比 ' + round(ar, 1) + ' ≥ 10：翼根弯矩大而结构高度小',
+          advice: '主梁必须用碳纤维（扁梁或双梁），单根碳管会扭转不足；翼肋间距缩到 110 mm 以内'
+        });
+      } else if (ar <= 4.2 && t.id !== 'heli') {
+        modifiers.push({
+          level: 'info', key: '小展弦比',
+          note: '展弦比 ' + round(ar, 1) + ' ≤ 4.2：弦长相对厚，抗弯容易满足',
+          advice: '可以用更简单的结构（单梁 + 轻木蒙皮），把重量预算留给动力与设备'
+        });
+      }
+      if (moment >= 120) {
+        modifiers.push({
+          level: 'error', key: '高翼根弯矩',
+          note: '翼根弯矩 ' + round(moment, 0) + ' N·m 属于高载荷',
+          advice: '必须做双梁或工字梁 + 翼根加强框；单梁/木质主梁在该载荷下会疲劳开裂，不要用'
+        });
+      } else if (moment >= 60) {
+        modifiers.push({
+          level: 'warn', key: '中等翼根弯矩',
+          note: '翼根弯矩 ' + round(moment, 0) + ' N·m 需要可靠的主梁接头',
+          advice: '主梁在翼根处加一层碳布缠绕或碳扁梁搭接，长度 ≥ 3 倍梁高'
+        });
+      }
+      if (vmax >= 45) {
+        modifiers.push({
+          level: 'warn', key: '高速颤振风险',
+          note: '最大速度约 ' + round(vmax, 0) + ' m/s，翼面动压高',
+          advice: '蒙皮必须与翼肋可靠胶接（热缩膜不可用于副翼段），副翼做质量平衡，铰链缝隙贴胶带'
+        });
+      }
+      if (span >= 2.4) {
+        modifiers.push({
+          level: 'info', key: '大翼展运输',
+          note: '翼展 ' + round(span, 2) + ' m，整根运输困难',
+          advice: '做成中段 + 两侧外翼三段式，插接套管用碳管套碳管，接缝处玻纤缠绕 2 层补强'
+        });
+      }
+      if (isFinite(c.mass) && c.mass >= 5) {
+        modifiers.push({
+          level: 'info', key: '大起飞重量',
+          note: '起飞重量 ' + round(c.mass, 1) + ' kg，属于需要实名与场地要求的级别',
+          advice: '结构按 1.5 倍安全系数设计，所有承力接头用螺栓 + 胶接双保险，首飞前做地面加载试验'
+        });
+      }
+    }
+
+    /* ---- 平尾 / 垂尾材料 ---- */
+    let clsH = 'light', clsV = 'light';
+    if (!isRotary) {
+      const tailLoad = (t.id === 'jet' || t.id === 'racer' || t.id === 'edf') ? 3
+        : (t.id === '3d' || t.id === 'cargo' ? 2
+          : (vmax >= 35 || (isFinite(c.tail && c.tail.Sh) && c.tail.Sh > 0.09) ? 2 : 1));
+      const pick = function (base) {
+        const lv = Math.min(3, base + (vmax >= 55 ? 1 : 0));
+        return lv >= 3 ? 'comp' : (lv === 2 ? 'stiff' : 'light');
+      };
+      clsH = pick(tailLoad);
+      // 垂尾承受螺旋桨滑流与侧风，通常比平尾高一档
+      clsV = pick(tailLoad + (t.id === '3d' || t.id === 'racer' ? 1 : 0));
+    }
+    const ph = TAIL_MATERIAL_PROFILES[clsH];
+    const pv = TAIL_MATERIAL_PROFILES[clsV];
+    const tl = c.tail || {};
+    const tail = isRotary ? null : {
+      h: {
+        cls: clsH, material: ph.material, structure: ph.structure, reason: ph.reason,
+        difficulty: ph.difficulty, cost: ph.cost,
+        span: tl.spanH, chord: tl.chordH, rootChord: tl.rootChordH, tipChord: tl.tipChordH,
+        ar: tl.arH, area: tl.Sh
+      },
+      v: {
+        cls: clsV, material: pv.material, structure: pv.structure, reason: pv.reason,
+        difficulty: pv.difficulty, cost: pv.cost,
+        span: tl.spanV, chord: tl.chordV, rootChord: tl.rootChordV, tipChord: tl.tipChordV,
+        ar: tl.arV, area: tl.Sv
+      }
+    };
+
+    const summary = isRotary
+      ? (t.name || '旋翼机') + '：' + prof.primary
+      : (t.name || '固定翼') + ' 机翼推荐「' + prof.primary + '」；平尾 ' + ph.material.split(' + ')[0] +
+        '、垂尾 ' + pv.material.split(' + ')[0];
+
+    return {
+      isRotary: isRotary,
+      typeId: t.id || null,
+      typeName: t.name || null,
+      wing: prof,
+      tail: tail,
+      modifiers: modifiers,
+      summary: summary,
+      // 一句话工艺路线，便于在导出表里单列
+      route: prof.process
+    };
+  }
+
+  /* =======================================================================
    * 12c. Inventor 建模设计参数
    *      输出 3D 建模（Autodesk Inventor 等）直接可用的尺寸，
    *      按零件分组：建模基准 / 机翼 / 副翼 / 机身 / 平尾 / 垂尾 /
@@ -1640,20 +2026,24 @@
     const r1 = function (v) { return isNum(v) ? +v.toFixed(1) : null; };
     const r2 = function (v) { return isNum(v) ? +v.toFixed(2) : null; };
 
-    // ---- 平尾几何（按梢根比 0.80 反推根弦/尖弦）----
-    const taperH = 0.8;
-    const bH = c.rotary ? null : c.tailSpanH;
-    const rootH = (!c.rotary && isNum(bH) && bH > 0) ? (2 * t.Sh) / (bH * (1 + taperH)) : null;
-    const tipH = rootH ? rootH * taperH : null;
-    // ---- 垂尾几何（取展弦比 1.40、梢根比 0.75）----
-    const ARv = 1.4, taperV = 0.75;
-    const hV = (!c.rotary && isNum(t.Sv)) ? Math.sqrt(t.Sv * ARv) : 0;
-    const rootV = (hV && hV > 0) ? (2 * t.Sv) / (hV * (1 + taperV)) : null;
-    const tipV = rootV ? rootV * taperV : null;
+    // ---- 尾翼几何：直接取核心计算结果（几何常数在核心计算里统一定义，
+    //      避免这里再算一套与 Excel / 3D 预览不一致的值）----
+    const taperH = isNum(t.taperH) ? t.taperH : 0.80;
+    const taperV = isNum(t.taperV) ? t.taperV : 0.75;
+    const bH = c.rotary ? null : (isNum(t.spanH) ? t.spanH : c.tailSpanH);
+    const rootH = c.rotary ? null : (isNum(t.rootChordH) ? t.rootChordH : null);
+    const tipH = c.rotary ? null : (isNum(t.tipChordH) ? t.tipChordH : null);
+    const hV = c.rotary ? 0 : (isNum(t.spanV) ? t.spanV : 0);
+    const rootV = c.rotary ? null : (isNum(t.rootChordV) ? t.rootChordV : null);
+    const tipV = c.rotary ? null : (isNum(t.tipChordV) ? t.tipChordV : null);
     // ---- 舵面弦长 ----
     const aileronChord = (!c.rotary && isNum(t.aileronRatio) && isNum(c.meanChord)) ? t.aileronRatio * c.meanChord : null;
-    const elevatorChord = (isNum(t.elevRatio) && isNum(rootH)) ? t.elevRatio * rootH : null;
-    const rudderChord = (isNum(t.rudderRatio) && isNum(rootV)) ? t.rudderRatio * rootV : null;
+    const elevatorChord = isNum(t.elevatorChord) ? t.elevatorChord
+      : ((isNum(t.elevRatio) && isNum(rootH)) ? t.elevRatio * rootH : null);
+    const rudderChord = isNum(t.rudderChord) ? t.rudderChord
+      : ((isNum(t.rudderRatio) && isNum(rootV)) ? t.rudderRatio * rootV : null);
+    // 材料推荐
+    const mat = c.material || null;
 
     // ---- 电池仓尺寸（按 0.36 Wh/cm³ 体积能量密度反推，再留 4 mm 余量）----
     let bayL = null, bayW = null, bayH = null;
@@ -1731,21 +2121,31 @@
     add('机身', '机头安装角（拉力线）', cg.thrustLine || '—', '', '电机轴相对翼弦的夹角');
 
     // ============ 平尾 ============
-    add('平尾', '平尾翼展', mm(c.tailSpanH), 'mm', '含升降舵');
-    add('平尾', '平尾根弦', mm(rootH), 'mm', '按梢根比 0.80 反推');
-    add('平尾', '平尾尖弦', mm(tipH), 'mm', '');
+    add('平尾', '平尾翼展', mm(c.tailSpanH), 'mm', '含升降舵，翼尖到翼尖');
+    add('平尾', '平尾根弦', mm(rootH), 'mm', '按梢根比 ' + r2(taperH) + ' 反推');
+    add('平尾', '平尾尖弦', mm(tipH), 'mm', '根弦 × 梢根比');
+    add('平尾', '平尾平均弦长', mm(t.chordH), 'mm', 'Sh / 翼展');
+    add('平尾', '平尾展弦比', r2(t.arH), '', 'ARh = 翼展² / 面积');
     add('平尾', '平尾面积', isFinite(t.Sh) ? +(t.Sh * 1e4).toFixed(1) : null, 'cm²', '尾容量 Vh = ' + r2(t.vh));
+    add('平尾', '平尾梢根比', r2(taperH), '', '尖弦 / 根弦');
     add('平尾', '尾臂 lh', mm(t.lh), 'mm', '机翼 MAC 25% → 平尾 MAC 25%');
     add('平尾', '升降舵弦长', mm(elevatorChord), 'mm', '弦长比 ' + r1((t.elevRatio || 0) * 100) + '%');
     add('平尾', '平尾安装角', '0 ~ -1', '°', '相对机翼弦线，略负以配平');
+    add('平尾', '平尾材质', mat && mat.tail ? mat.tail.h.material : '—', '', mat && mat.tail ? mat.tail.h.reason : '');
+    add('平尾', '平尾结构方案', mat && mat.tail ? mat.tail.h.structure : '—', '', mat && mat.tail ? ('制作难度 ' + mat.tail.h.difficulty + '，成本 ' + mat.tail.h.cost) : '');
 
     // ============ 垂尾 ============
-    add('垂尾', '垂尾高度', mm(hV), 'mm', '按展弦比 1.40 反推');
-    add('垂尾', '垂尾根弦', mm(rootV), 'mm', '按梢根比 0.75 反推');
-    add('垂尾', '垂尾尖弦', mm(tipV), 'mm', '');
+    add('垂尾', '垂尾高度（翼展）', mm(hV), 'mm', '根部到翼尖的垂直距离，按展弦比 ' + r2(t.arV) + ' 反推');
+    add('垂尾', '垂尾根弦', mm(rootV), 'mm', '按梢根比 ' + r2(taperV) + ' 反推');
+    add('垂尾', '垂尾尖弦', mm(tipV), 'mm', '根弦 × 梢根比');
+    add('垂尾', '垂尾平均弦长', mm(t.chordV), 'mm', '根弦 + 尖弦 的平均');
+    add('垂尾', '垂尾展弦比', r2(t.arV), '', 'ARv = 高度² / 面积');
     add('垂尾', '垂尾面积', isFinite(t.Sv) ? +(t.Sv * 1e4).toFixed(1) : null, 'cm²', '尾容量 Vv = ' + r2(t.vv));
+    add('垂尾', '垂尾梢根比', r2(taperV), '', '尖弦 / 根弦');
     add('垂尾', '方向舵弦长', mm(rudderChord), 'mm', '弦长比 ' + r1((t.rudderRatio || 0) * 100) + '%');
     add('垂尾', '垂尾后掠角', '0 ~ 10', '°', '常规 5°，竞速机可加大');
+    add('垂尾', '垂尾材质', mat && mat.tail ? mat.tail.v.material : '—', '', mat && mat.tail ? mat.tail.v.reason : '');
+    add('垂尾', '垂尾结构方案', mat && mat.tail ? mat.tail.v.structure : '—', '', mat && mat.tail ? ('制作难度 ' + mat.tail.v.difficulty + '，成本 ' + mat.tail.v.cost) : '');
     }  // end !rotary：机翼 / 副翼 / 平尾 / 垂尾 仅固定翼适用
 
     // ============ 重心与电池仓 ============
@@ -1781,7 +2181,18 @@
     }
 
     // ============ 结构与材料 ============
-    add('结构与材料', '主体材料', st.materials || '—', '', '');
+    add('结构与材料', '主体材料', st.materials || '—', '', '按机型给出的简写，详见「机翼材质」各分项');
+    if (mat && mat.wing) {
+      add('结构与材料', '机翼材质（推荐）', mat.wing.primary, '', mat.wing.reasons[0] || '');
+      add('结构与材料', '机翼结构方案', mat.wing.structure, '', '按用途与载荷选型');
+      add('结构与材料', '主梁方案', mat.wing.spar, '', '承弯构件，直径需与翼型内腔匹配');
+      add('结构与材料', '蒙皮方案', mat.wing.skin, '', '承扭与外形精度');
+      add('结构与材料', '翼肋方案', mat.wing.ribs, '', '维持翼型形状');
+      add('结构与材料', '制造工艺', mat.wing.process, '', '制作难度 ' + mat.wing.difficulty + '，成本 ' + mat.wing.cost + '，重量 ' + mat.wing.weight);
+      add('结构与材料', '机翼备选方案', mat.wing.alternatives.map(function (a) { return a.name; }).join(' / '), '',
+        mat.wing.alternatives.map(function (a) { return a.name + '：' + a.when + '（' + a.tradeoff + '）'; }).join('；'));
+      add('结构与材料', '不推荐做法', mat.wing.avoid.join('；'), '', '这些做法在该用途下会明显吃亏');
+    }
     add('结构与材料', '设计过载', st.nLimit + ' G', '', '机翼需承受 ' + r1(st.nLimit * c.mass * 9.80665) + ' N 的升力');
     add('结构与材料', '安全系数', st.safetyFactor, '', '');
     add('结构与材料', '翼根弯矩', r1(st.rootMoment) + ' N·m', '', '建模时碳管主梁按此校核');
