@@ -612,6 +612,48 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
   background:rgba(255,255,255,.10);color:var(--tx3);font-weight:500}
 #view-result .tab.on .cnt{background:rgba(76,201,240,.24);color:var(--acc)}
 #view-result .tab .cnt:empty{display:none}
+/* 材料与工艺 */
+#panel-material .mblock{border:1px solid var(--line);border-radius:10px;padding:13px 15px;background:rgba(255,255,255,.02)}
+#panel-material .mtitle{font-size:12px;font-weight:700;color:var(--acc);letter-spacing:.5px;margin-bottom:10px}
+#panel-material .mprimary{font-size:14px;font-weight:700;color:var(--tx);margin-bottom:11px;line-height:1.6}
+#panel-material .mprimary.sm{font-size:12.5px}
+#panel-material .mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:9px 18px;margin-bottom:11px}
+#panel-material .mgrid > div{font-size:11.5px;line-height:1.7}
+#panel-material .mgrid span{display:block;color:var(--tx3);font-size:10.5px}
+#panel-material .mgrid b{color:var(--tx2);font-weight:500}
+#panel-material .mreasons{margin:0;padding-left:19px;font-size:11.5px;color:var(--tx2);line-height:1.9}
+#panel-material .mavoid{margin:0;padding-left:19px;font-size:11.5px;color:var(--warn);line-height:1.9}
+#panel-material .mmods{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px}
+#panel-material .mmod{border-left:3px solid var(--line);padding:8px 11px;font-size:11.5px;
+  color:var(--tx2);line-height:1.75;background:rgba(255,255,255,.02);border-radius:0 7px 7px 0}
+#panel-material .mmod.warn{border-left-color:var(--warn)}
+#panel-material .mmod.err{border-left-color:var(--err)}
+#panel-material .mmod b{display:block;color:var(--tx);margin-bottom:4px}
+#panel-material .mmod .madv{color:var(--ok);margin-top:4px}
+#panel-material .malts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+#panel-material .malt{border:1px dashed var(--line);border-radius:8px;padding:9px 12px;font-size:11.5px;line-height:1.75;color:var(--tx2)}
+#panel-material .malt b{display:block;color:var(--tx);margin-bottom:5px;font-size:12px}
+#panel-material .malt span{color:var(--tx3);margin-right:6px}
+#panel-material .mtailgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px}
+#panel-material .mtailsurf{border:1px solid var(--line);border-radius:9px;padding:11px 13px;background:rgba(255,255,255,.02)}
+#panel-material .mtshead{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+#panel-material .mtshead b{font-size:13px;color:var(--tx)}
+#panel-material .mgeo{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px}
+#panel-material .mgeo span{font-size:11px;padding:3px 9px;border-radius:14px;
+  background:rgba(76,201,240,.12);color:var(--acc);font-variant-numeric:tabular-nums}
+#panel-material .mmeta{font-size:11px;color:var(--tx2);line-height:1.75;margin-top:3px}
+#panel-material .mmeta span{color:var(--tx3);margin-right:6px}
+#panel-material .mchip{font-size:10px;padding:2px 8px;border-radius:12px;font-weight:600;
+  background:rgba(255,255,255,.09);color:var(--tx2)}
+#panel-material .mchip.stiff{background:rgba(249,199,79,.18);color:var(--gold)}
+#panel-material .mchip.comp{background:rgba(255,92,114,.18);color:var(--err)}
+#panel-material .mchip.warn{background:rgba(249,199,79,.18);color:var(--gold)}
+#panel-material .mchip.err{background:rgba(255,92,114,.18);color:var(--err)}
+#panel-material .msummary{margin-top:4px;padding:11px 14px;border-radius:9px;font-size:12px;
+  color:var(--tx2);background:rgba(57,217,138,.07);border:1px solid rgba(57,217,138,.25);line-height:1.8}
+@media (max-width:900px){
+  #panel-material .mgrid,#panel-material .mmods,#panel-material .malts,#panel-material .mtailgrid{grid-template-columns:1fr}
+}
 #view-result .tpanel{display:none}
 #view-result .tpanel.on{display:flex;flex-direction:column;gap:16px}
 /* 三套方案横排 */
@@ -836,6 +878,7 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
     <button class="tab" data-tab="view3d">三视图 3D</button>
     <button class="tab" data-tab="check">约束校验<span class="cnt" id="tabN2"></span></button>
     <button class="tab" data-tab="bom">器件 BOM<span class="cnt" id="tabN3"></span></button>
+    <button class="tab" data-tab="material">材料与工艺</button>
     <button class="tab" data-tab="score">评分明细</button>
     <button class="tab" data-tab="export">命名与导出</button>
   </div>
@@ -857,6 +900,9 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
   <div class="tpanel" id="panel-bom">
     <div id="resBom"></div>
     <div id="resCompliance"></div>
+  </div>
+  <div class="tpanel" id="panel-material">
+    <div id="resMat"></div>
   </div>
   <div class="tpanel" id="panel-score">
     <div id="resScore"></div>
@@ -1056,6 +1102,17 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
         <div class="btnrow" style="margin-top:11px">
           <button class="btn sm" id="btnBomJson">⤓ 导出 BOM JSON</button>
           <button class="btn sm" id="btnBomCsv">⤓ 导出 BOM CSV</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="cardMat" style="display:none">
+      <h2><span class="n">10d</span>制造材料与工艺<span class="r" id="matSum"></span></h2>
+      <div class="body">
+        <div class="hint" style="margin-bottom:11px">按机型用途给出机翼主推材料、备选方案与不推荐做法；平尾/垂尾的材质按尾翼载荷分档。</div>
+        <div id="matBody"></div>
+        <div class="btnrow" style="margin-top:11px">
+          <button class="btn sm" id="btnMatTxt">⤓ 导出材料清单（TXT）</button>
         </div>
       </div>
     </div>
@@ -1618,7 +1675,7 @@ function doPlan() {
   $('btnApply').disabled = false;
   $('btnUnlock').disabled = false;
   $('btnXlsx').disabled = true;
-  ['cardDim','cardAf','cardScore','cardCmp','cardCheck','cardReason','cardName','cardOut']
+  ['cardDim','cardAf','cardScore','cardCmp','cardCheck','cardReason','cardName','cardOut','cardMat']
     .forEach(id => { $(id).style.display = ''; });
   $('exportMsg').textContent = '';
   // 参数齐了就翻到结果页（三套方案 + 3D 图并排）
@@ -1858,18 +1915,39 @@ function renderParams() {
   if (S.paramTab === 'tail') {
     if (rw) { rows.push('<tr><td colspan="4" class="empty">旋翼机型不使用尾翼布局</td></tr>'); }
     else {
-      G('平尾');
-      R('平尾面积', null, c.tail.Sh * 1e4, 'cm²', 'Vh = Sh·lh/(S·MAC)', 0);
-      R('平尾容量 Vh', null, c.tail.vh, '', '经验 0.35~0.72', 3);
-      R('升降舵弦长比', null, c.tail.elevRatio * 100, '%', '常规 35~45%', 0);
-      G('垂尾');
-      R('垂尾面积', null, c.tail.Sv * 1e4, 'cm²', 'Vv = Sv·lv/(S·b)', 0);
-      R('垂尾容量 Vv', null, c.tail.vv, '', '经验 0.022~0.070', 3);
-      R('方向舵弦长比', null, c.tail.rudderRatio * 100, '%', '常规 35~45%', 0);
+      const tl = c.tail || {}, mt = c.material && c.material.tail;
+      G('平尾 · 几何');
+      R('平尾翼展', null, tl.spanH != null ? tl.spanH * 1000 : null, 'mm', '翼尖到翼尖，含升降舵', 0);
+      R('平尾根弦', null, tl.rootChordH != null ? tl.rootChordH * 1000 : null, 'mm',
+        '梢根比 ' + fmt((tl.taperH || 0.8) * 100, 0) + '%', 0);
+      R('平尾尖弦', null, tl.tipChordH != null ? tl.tipChordH * 1000 : null, 'mm', '根弦 × 梢根比', 0);
+      R('平尾平均弦长', null, tl.chordH != null ? tl.chordH * 1000 : null, 'mm', 'Sh / 翼展', 0);
+      R('平尾展弦比 ARh', null, tl.arH, '', '翼展² / 面积', 2);
+      R('平尾面积', null, tl.Sh * 1e4, 'cm²', 'Vh = Sh·lh/(S·MAC)', 0);
+      R('平尾容量 Vh', null, tl.vh, '', '经验 0.35~0.72', 3);
+      R('升降舵弦长', null, tl.elevatorChord != null ? tl.elevatorChord * 1000 : null, 'mm',
+        '弦长比 ' + fmt(tl.elevRatio * 100, 0) + '%', 0);
+      G('平尾 · 材质');
+      R('平尾材质', null, mt ? mt.h.material : '—', '', mt ? mt.h.reason : '');
+      R('平尾结构方案', null, mt ? mt.h.structure : '—', '', mt ? ('难度 ' + mt.h.difficulty + '，成本 ' + mt.h.cost) : '');
+      G('垂尾 · 几何');
+      R('垂尾高度（翼展）', null, tl.spanV != null ? tl.spanV * 1000 : null, 'mm', '根部到翼尖的垂直距离', 0);
+      R('垂尾根弦', null, tl.rootChordV != null ? tl.rootChordV * 1000 : null, 'mm',
+        '梢根比 ' + fmt((tl.taperV || 0.75) * 100, 0) + '%', 0);
+      R('垂尾尖弦', null, tl.tipChordV != null ? tl.tipChordV * 1000 : null, 'mm', '根弦 × 梢根比', 0);
+      R('垂尾平均弦长', null, tl.chordV != null ? tl.chordV * 1000 : null, 'mm', '根弦与尖弦平均', 0);
+      R('垂尾展弦比 ARv', null, tl.arV, '', '高度² / 面积', 2);
+      R('垂尾面积', null, tl.Sv * 1e4, 'cm²', 'Vv = Sv·lv/(S·b)', 0);
+      R('垂尾容量 Vv', null, tl.vv, '', '经验 0.022~0.070', 3);
+      R('方向舵弦长', null, tl.rudderChord != null ? tl.rudderChord * 1000 : null, 'mm',
+        '弦长比 ' + fmt(tl.rudderRatio * 100, 0) + '%', 0);
+      G('垂尾 · 材质');
+      R('垂尾材质', null, mt ? mt.v.material : '—', '', mt ? mt.v.reason : '');
+      R('垂尾结构方案', null, mt ? mt.v.structure : '—', '', mt ? ('难度 ' + mt.v.difficulty + '，成本 ' + mt.v.cost) : '');
       G('尾臂与舵面');
-      R('尾臂 lh', null, c.tail.lh * 1000, 'mm', '重心→平尾焦点', 0);
-      R('尾臂 lv', null, c.tail.lv * 1000, 'mm', '重心→垂尾焦点', 0);
-      R('副翼弦长比', null, c.tail.aileronRatio * 100, '%', '', 0);
+      R('尾臂 lh', null, tl.lh * 1000, 'mm', '重心→平尾焦点', 0);
+      R('尾臂 lv', null, tl.lv * 1000, 'mm', '重心→垂尾焦点', 0);
+      R('副翼弦长比', null, tl.aileronRatio * 100, '%', '', 0);
     }
   }
 
@@ -2986,6 +3064,7 @@ function assembleStages() {
   move('cardCheck', 'resCheck');      // 约束校验
   move('cardReason', 'resReason');
   move('cardBom', 'resBom');          // 器件 BOM
+  move('cardMat', 'resMat');          // 材料与工艺
   move('cardCompliance', 'resCompliance');
   move('cardScore', 'resScore');      // 评分明细
   move('cardName', 'resName');        // 命名与导出
@@ -3044,6 +3123,141 @@ function showStage(which) {
   try { if (window.scrollTo) window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) {}
 }
 
+/* =====================================================================
+ * 制造材料与工艺（按用途推荐机翼材料 + 平尾/垂尾材质）
+ * =================================================================== */
+const MAT_LV = { ok: '通过', warn: '注意', error: '风险', info: '提示' };
+function renderMaterials() {
+  const card = $('cardMat'), box = $('matBody');
+  if (!card || !box) return;
+  if (!S.result) { card.style.display = 'none'; return; }
+  const plan = S.result.top3[S.selected].plan;
+  const c = plan.core;
+  const m = c.material;
+  if (!m) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const w = m.wing;
+  if ($('matSum')) $('matSum').innerHTML = '<span class="badge ok">' + m.wing.difficulty + '难度 · ' + m.wing.cost + '成本</span>';
+
+  const chip = function (t, cls) { return '<span class="mchip ' + (cls || '') + '">' + esc(t) + '</span>'; };
+
+  let html = '';
+  /* ---- 机翼 ---- */
+  html += '<div class="mblock">' +
+    '<div class="mtitle">机翼 · 主推方案</div>' +
+    '<div class="mprimary">' + esc(w.primary) + '</div>' +
+    '<div class="mgrid">' +
+    '<div><span>结构方案</span><b>' + esc(w.structure) + '</b></div>' +
+    '<div><span>主梁</span><b>' + esc(w.spar) + '</b></div>' +
+    '<div><span>蒙皮</span><b>' + esc(w.skin) + '</b></div>' +
+    '<div><span>翼肋</span><b>' + esc(w.ribs) + '</b></div>' +
+    '<div><span>工艺路线</span><b>' + esc(w.process) + '</b></div>' +
+    '<div><span>难度 / 成本 / 重量</span><b>' + esc(w.difficulty) + ' / ' + esc(w.cost) + ' / ' + esc(w.weight) + '</b></div>' +
+    '</div>' +
+    '<ul class="mreasons">' + w.reasons.map(function (r) { return '<li>' + esc(r) + '</li>'; }).join('') + '</ul>' +
+    '</div>';
+
+  /* ---- 修正建议 ---- */
+  if (m.modifiers && m.modifiers.length) {
+    html += '<div class="mblock"><div class="mtitle">针对本方案的调整建议</div><div class="mmods">' +
+      m.modifiers.map(function (x) {
+        const cls = x.level === 'error' ? 'err' : (x.level === 'warn' ? 'warn' : '');
+        return '<div class="mmod ' + cls + '"><b>' + chip(MAT_LV[x.level] || x.level, cls) + ' ' + esc(x.key) + '</b>' +
+          '<div>' + esc(x.note) + '</div><div class="madv">→ ' + esc(x.advice) + '</div></div>';
+      }).join('') + '</div></div>';
+  }
+
+  /* ---- 备选与不推荐 ---- */
+  html += '<div class="mblock"><div class="mtitle">备选方案</div><div class="malts">' +
+    w.alternatives.map(function (a) {
+      return '<div class="malt"><b>' + esc(a.name) + '</b>' +
+        '<div><span>适用</span>' + esc(a.when) + '</div>' +
+        '<div><span>代价</span>' + esc(a.tradeoff) + '</div></div>';
+    }).join('') + '</div></div>';
+
+  html += '<div class="mblock"><div class="mtitle">不推荐做法</div>' +
+    '<ul class="mavoid">' + w.avoid.map(function (a) { return '<li>' + esc(a) + '</li>'; }).join('') + '</ul></div>';
+
+  /* ---- 尾翼 ---- */
+  if (m.tail) {
+    const tf = function (t, title) {
+      const geo = [];
+      if (isFinite(t.span)) geo.push('翼展 ' + Math.round(t.span * 1000) + ' mm');
+      if (isFinite(t.rootChord)) geo.push('根弦 ' + Math.round(t.rootChord * 1000) + ' mm');
+      if (isFinite(t.tipChord)) geo.push('尖弦 ' + Math.round(t.tipChord * 1000) + ' mm');
+      if (isFinite(t.chord)) geo.push('平均弦 ' + Math.round(t.chord * 1000) + ' mm');
+      if (isFinite(t.ar)) geo.push('展弦比 ' + fmt(t.ar, 2));
+      if (isFinite(t.area)) geo.push('面积 ' + fmt(t.area * 1e4, 0) + ' cm²');
+      return '<div class="mtailsurf"><div class="mtshead"><b>' + title + '</b>' +
+        chip(t.cls === 'comp' ? '高载荷' : (t.cls === 'stiff' ? '中载荷' : '轻载荷'), t.cls) + '</div>' +
+        '<div class="mprimary sm">' + esc(t.material) + '</div>' +
+        '<div class="mgeo">' + geo.map(function (g) { return '<span>' + g + '</span>'; }).join('') + '</div>' +
+        '<div class="mmeta"><span>结构</span>' + esc(t.structure) + '</div>' +
+        '<div class="mmeta"><span>理由</span>' + esc(t.reason) + '</div>' +
+        '<div class="mmeta"><span>难度 / 成本</span>' + esc(t.difficulty) + ' / ' + esc(t.cost) + '</div>' +
+        '</div>';
+    };
+    html += '<div class="mblock"><div class="mtitle">平尾 / 垂尾</div>' +
+      '<div class="mtailgrid">' + tf(m.tail.h, '平尾') + tf(m.tail.v, '垂尾') + '</div></div>';
+  } else {
+    html += '<div class="mblock"><div class="mtitle">平尾 / 垂尾</div>' +
+      '<div class="hint">旋翼机型不使用尾翼布局，材料按机架与传动件给出（见上方主推方案）。</div></div>';
+  }
+
+  html += '<div class="msummary"><b>一句话结论：</b>' + esc(m.summary) + '</div>';
+  box.innerHTML = html;
+}
+
+if ($('btnMatTxt')) {
+  $('btnMatTxt').onclick = function () {
+    if (!S.result) { toast('请先生成方案', 'err'); return; }
+    const m = S.result.top3[S.selected].plan.core.material;
+    const L = [];
+    L.push('制造材料与工艺清单');
+    L.push('生成时间：' + new Date().toLocaleString('zh-CN'));
+    L.push('机型：' + (m.typeName || S.result.typeName));
+    L.push('');
+    L.push('【机翼】');
+    L.push('主推方案：' + m.wing.primary);
+    L.push('结构方案：' + m.wing.structure);
+    L.push('主梁：' + m.wing.spar);
+    L.push('蒙皮：' + m.wing.skin);
+    L.push('翼肋：' + m.wing.ribs);
+    L.push('工艺路线：' + m.wing.process);
+    L.push('难度/成本/重量：' + m.wing.difficulty + ' / ' + m.wing.cost + ' / ' + m.wing.weight);
+    L.push('理由：');
+    m.wing.reasons.forEach(function (r) { L.push('  - ' + r); });
+    L.push('备选方案：');
+    m.wing.alternatives.forEach(function (a) { L.push('  - ' + a.name + '（适用：' + a.when + '；代价：' + a.tradeoff + '）'); });
+    L.push('不推荐：');
+    m.wing.avoid.forEach(function (a) { L.push('  - ' + a); });
+    if (m.modifiers && m.modifiers.length) {
+      L.push('');
+      L.push('【本方案调整建议】');
+      m.modifiers.forEach(function (x) { L.push('  [' + (MAT_LV[x.level] || x.level) + '] ' + x.key + '：' + x.note + ' → ' + x.advice); });
+    }
+    if (m.tail) {
+      ['h', 'v'].forEach(function (k) {
+        const t = m.tail[k], nm = k === 'h' ? '平尾' : '垂尾';
+        L.push('');
+        L.push('【' + nm + '】');
+        L.push('材质：' + t.material);
+        L.push('结构：' + t.structure);
+        L.push('理由：' + t.reason);
+        L.push('难度/成本：' + t.difficulty + ' / ' + t.cost);
+        L.push('翼展：' + (isFinite(t.span) ? Math.round(t.span * 1000) + ' mm' : '—'));
+        L.push('根弦：' + (isFinite(t.rootChord) ? Math.round(t.rootChord * 1000) + ' mm' : '—'));
+        L.push('尖弦：' + (isFinite(t.tipChord) ? Math.round(t.tipChord * 1000) + ' mm' : '—'));
+        L.push('面积：' + (isFinite(t.area) ? fmt(t.area * 1e4, 0) + ' cm²' : '—'));
+      });
+    }
+    L.push('');
+    L.push('结论：' + m.summary);
+    dlText((S.result.typeName || '方案') + '_材料清单.txt', L.join('\r\n'), 'text/plain');
+    toast('材料清单已导出', 'ok');
+  };
+}
+
 /* 结果页标签切换：一次只显示一块，避免长条滚动与空白栏 */
 let TAB = 'compare';
 function showTab(key) {
@@ -3057,6 +3271,7 @@ function showTab(key) {
     p.classList.toggle('on', p.id === 'panel-' + TAB);
   });
   // 3D 面板可见后才量尺寸
+  if (TAB === 'material') { try { renderMaterials(); } catch (e) {} }
   if (TAB === 'view3d') {
     setTimeout(function () {
       try { vdInit(); } catch (e) {}
@@ -3138,6 +3353,7 @@ renderPlans = function (res) {
   try { updateTabCounts(); } catch (e) {}
   try { updateStepBar(); } catch (e) {}
   try { vdInit(); } catch (e) { console.warn('3D 预览初始化失败', e); }
+  try { renderMaterials(); } catch (e) { console.warn(e); }
 };
 
 /* =====================================================================
