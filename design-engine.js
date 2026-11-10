@@ -1102,7 +1102,10 @@
   /* =======================================================================
    * 7. 约束校验
    * ===================================================================== */
-  function check(core, type) {
+  function check(core, type, src) {
+    const SRC = src || {};
+    // 该值是否由用户锚点直接指定（锚点驱动的偏离是刻意选择，只降级为警告）
+    const fromAnchor = function (k) { return SRC[k] === 'anchor'; };
     const items = [];
     /**
      * 三级校验：level ∈ 'ok' | 'warn' | 'error'
@@ -1156,7 +1159,7 @@
      * @param dir 'min' = 期望 actual ≥ limit（越大越好）；'max' = 期望 actual ≤ limit（越小越好）
      * @param errRatio 超出限值多少比例后升级为「错误」（默认 0.25，即 25%）
      */
-    const rel = function (actual, limit, dir, cat, name, unit, msgOk, msgBad, adviceBad, errRatio) {
+    const rel = function (actual, limit, dir, cat, name, unit, msgOk, msgBad, adviceBad, errRatio, forced) {
       if (!isFinite(actual) || !isFinite(limit)) return;
       const u = unit || '';
       const a = round(actual, 2), L = round(limit, 2);
@@ -1169,9 +1172,12 @@
         return;
       }
       const bad = Math.abs(actual - limit) / Math.max(1e-9, Math.abs(limit));
-      const level = bad > (isFinite(errRatio) ? errRatio : 0.25) ? 'error' : 'warn';
+      // 若这个偏离来自用户显式锚点（forced），说明是刻意的设计选择，
+      // 最多降到「警告」——否则用户一旦给出偏离常规的锚点，整个方案会被判不可行。
+      const level = forced ? 'warn' : (bad > (isFinite(errRatio) ? errRatio : 0.25) ? 'error' : 'warn');
       add(level, cat, name, a + u + ' ' + symBad + ' ' + L + u, band,
-        msgBad || '偏离该机型要求', adviceBad || ('把 ' + name + ' 调到 ' + band + ' 以内'));
+        (msgBad || '偏离该机型要求') + (forced ? '（该值由你的锚点指定）' : ''),
+        adviceBad || ('把 ' + name + ' 调到 ' + band + ' 以内'));
     };
     const R = type.range;
 
@@ -1221,12 +1227,13 @@
       rel(core.vStall, type.range.stall[1], 'max', '交叉', '失速速度 vs 机型期望', ' m/s',
         '失速速度不超过该机型期望上限',
         '失速速度超出该机型期望上限，起降与低速盘旋会变难',
-        '加大翼面积或减轻重量，把失速速度降到 ' + type.range.stall[1] + ' m/s 以下', 0.25);
+        '加大翼面积或减轻重量，把失速速度降到 ' + type.range.stall[1] + ' m/s 以下', 0.25,
+        fromAnchor('wl') || fromAnchor('mass') || fromAnchor('area') || fromAnchor('span') || fromAnchor('ar'));
       rel(core.perf.thrustToWeight, type.range.twr[0], 'min', '交叉', '推重比 vs 机型期望', '',
         '推重比达到该机型下限，爬升与加速能力够用',
         '可用推重比低于该机型下限，爬升与加速能力不足',
         '换更大推力的动力组合（加大桨径 / 提高 KV 或电压 / 降低起飞重量），把推重比提到 ' +
-        type.range.twr[0] + ' 以上', 0.25);
+        type.range.twr[0] + ' 以上', 0.25, fromAnchor('twr'));
       cross(core.wlGdm2 > type.range.wl[1] && core.perf.thrustToWeight < 0.7,
         '交叉', '高翼载 + 低推重比',
         round(core.wlGdm2, 0) + ' g/dm²（上限 ' + type.range.wl[1] + '） / T/W ' + round(core.perf.thrustToWeight, 2),
@@ -1250,7 +1257,7 @@
       rel(tw, type.range.twr[0], 'min', '交叉', '推重比 vs 机型期望', '',
         '推重比达到该机型下限',
         '推重比不足，抗风与机动能力差',
-        '加大桨径 / 提高电压 / 减重，把推重比提到 ' + type.range.twr[0] + ' 以上', 0.15);
+        '加大桨径 / 提高电压 / 减重，把推重比提到 ' + type.range.twr[0] + ' 以上', 0.15, fromAnchor('twr'));
       rel(core.rotary.enduranceMin, 3, 'min', '交叉', '续航 vs 电池', ' min',
         '悬停续航不低于 3 分钟',
         '悬停续航不足 3 分钟，需加大电池容量或减轻重量',
@@ -1380,7 +1387,7 @@
       core.airfoilWarning = '翼型编号「' + values.airfoil + '」无法识别（' + (af.reason || '') +
         '），本次已临时按 NACA 2412 计算。请改用 4 位（2412）、5 位（23012）或 6 位（65-210）编号。';
     }
-    const constraints = check(core, type);
+    const constraints = check(core, type, src);
     const fails = hardFails(constraints);
     const warnings = constraints.filter(function (i) { return i.level === 'warn'; });
 
@@ -1413,6 +1420,8 @@
       values: values, source: src, core: core, constraints: constraints,
       errors: fails, warnings: allWarnings, score: sc,
       feasible: fails.length === 0,
+      // clean = 既无错误也无警告，完全落在该机型的经验区间内
+      clean: fails.length === 0 && constraints.every(function (c) { return c.level === 'ok'; }),
       confidence: clamp(Math.round(seedInfo && seedInfo.confidence ? seedInfo.confidence : 80), 20, 98)
     };
   }
@@ -1466,6 +1475,7 @@
       if (x.warnings.length !== y.warnings.length) return x.warnings.length - y.warnings.length;
       return y.score.consistency - x.score.consistency;
     });
+    // 硬性保证：只要存在可行方案，best 一定从可行集里取
     return { all: built, feasible: ok, best: ok[0] || built[0] };
   }
 
@@ -2353,6 +2363,7 @@
       ok: true, version: VERSION, typeId: type.id, typeName: type.name,
       mode: 'auto', modeName: '引擎补全并择优',
       inferred: inferred, candidatesEvaluated: cands.all.length, feasibleCount: cands.feasible.length,
+      cleanCount: cands.all.filter(function (p) { return p.clean; }).length,
       top3: plans, best: plans[0].plan, airfoilRecommendations: airfoilRec,
       // 全锚点取值汇总（含引擎计算出的其余锚点，如桨径 / 电机 KV / 续航等）
       anchorValues: anchorValues(plans[0].plan),
