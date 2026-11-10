@@ -612,6 +612,20 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
   background:rgba(255,255,255,.10);color:var(--tx3);font-weight:500}
 #view-result .tab.on .cnt{background:rgba(76,201,240,.24);color:var(--acc)}
 #view-result .tab .cnt:empty{display:none}
+/* 参数来源徽标 */
+.srcb{display:inline-block;font-size:9.5px;line-height:1.5;padding:0 5px;border-radius:5px;
+  margin-left:5px;font-weight:600;font-style:normal;vertical-align:1px}
+.srcb.anchor{background:rgba(76,201,240,.22);color:#4cc9f0}
+.srcb.derived{background:rgba(57,217,138,.20);color:#39d98a}
+.srcb.template{background:rgba(255,255,255,.10);color:#8b9bb4}
+.srcsum{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--tx3);margin-bottom:7px}
+.srcsum b{font-weight:600}
+.srcsum .s-anchor{color:#4cc9f0}
+.srcsum .s-derived{color:#39d98a}
+.srcsum .s-template{color:#8b9bb4}
+.srclegend{display:flex;gap:16px;flex-wrap:wrap;font-size:10.5px;color:var(--tx3);line-height:1.8}
+.srclegend span{display:flex;align-items:center;gap:5px}
+.srclegend .srcb{margin-left:0}
 /* 材料与工艺 */
 #panel-material .mblock{border:1px solid var(--line);border-radius:10px;padding:13px 15px;background:rgba(255,255,255,.02)}
 #panel-material .mtitle{font-size:12px;font-weight:700;color:var(--acc);letter-spacing:.5px;margin-bottom:10px}
@@ -1589,8 +1603,9 @@ function renderModeBanner() {
   const gain = hasBoth ? (a - r) : 0;
   let txt;
   if (isRaw) {
-    txt = '<b>当前模式：纯输入</b>（未使用引擎推荐）—— 只用你给的锚点 + 机型模板默认值，' +
-      '<b>不做联动推导、不择优</b>。<br>' +
+    txt = '<b>当前模式：纯输入</b>（未使用引擎推荐）—— 你给的锚点不动，' +
+      '<b>其余参数按物理公式算出</b>（重量÷翼载=面积、面积×展弦比=翼展、推重比×重量=所需推力…），' +
+      '<b>不搜索、不择优</b>；只有物理上确实缺输入时，才回落机型经验值（参数表里标「模」）。<br>' +
       '综合得分 <span class="sc">' + S.result.best.score.total + '</span> 分' +
       (S.consRaw != null ? '（锚点一致性 ' + S.consRaw + '%）' : '') +
       (hasBoth && gain > 0
@@ -1824,6 +1839,16 @@ function renderParams() {
     return '<td><button class="lockbtn' + (on ? ' on' : '') + '" data-lock="' + k + '" title="锁定此项">' +
       (on ? '🔒' : '🔓') + '</button></td>';
   };
+  // 参数来源：你指定（anchor）/ 计算得出（derived）/ 模板假设（template）
+  const SRC = p.source || {};
+  const SRC_TXT = { anchor: '你指定', derived: '计算得出', template: '模板假设' };
+  const srcBadge = (k) => {
+    if (!k) return '';
+    const sv = SRC[k];
+    if (!SRC_TXT[sv]) return '';
+    return '<span class="srcb ' + sv + '" title="' + SRC_TXT[sv] + '">' +
+      (sv === 'anchor' ? '你' : sv === 'derived' ? '算' : '模') + '</span>';
+  };
   const R = (name, k, val, unit, note, dec) => {
     const locked = k && S.locks[k] !== undefined;
     const shown = locked ? S.locks[k] : val;
@@ -1833,12 +1858,27 @@ function renderParams() {
       '<td class="pv">' + (editable
         ? '<input type="number" data-edit="' + k + '" value="' + (isFinite(shown) ? shown : '') + '" step="any">'
         : (typeof shown === 'number' ? fmt(shown, dec == null ? 2 : dec) : (shown == null ? '—' : shown))) +
-        (editable ? '' : ' <span class="pu">' + (unit || '') + '</span>') + '</td>' +
+        (editable ? '' : ' <span class="pu">' + (unit || '') + '</span>') + srcBadge(k) + '</td>' +
       '<td class="pf">' + (note || '') + '</td></tr>');
   };
   const G = (t) => rows.push('<tr><td colspan="4" class="grp">' + t + '</td></tr>');
 
   if (S.paramTab === 'overview') {
+    // 数据来源统计：一眼看出哪些是你给的、哪些是算出来的、哪些是模板假设
+    const nA = Object.keys(SRC).filter(function (k) { return SRC[k] === 'anchor'; }).length;
+    const nD = Object.keys(SRC).filter(function (k) { return SRC[k] === 'derived'; }).length;
+    const nT = Object.keys(SRC).filter(function (k) { return SRC[k] === 'template'; }).length;
+    rows.push('<tr><td colspan="4" style="padding:8px 4px 11px">' +
+      '<div class="srcsum">数据来源：' +
+      '<b class="s-anchor">你指定 ' + nA + ' 项</b>' +
+      '<b class="s-derived">计算得出 ' + nD + ' 项</b>' +
+      '<b class="s-template">模板假设 ' + nT + ' 项</b>' +
+      '</div>' +
+      '<div class="srclegend">' +
+      '<span><i class="srcb anchor">你</i> 你勾选并填入的锚点，引擎不得改动</span>' +
+      '<span><i class="srcb derived">算</i> 由其它参数按物理公式推算</span>' +
+      '<span><i class="srcb template">模</i> 缺少必要输入时的机型经验值（可自行覆盖）</span>' +
+      '</div></td></tr>');
     G('总体参数');
     R('机型', null, p.typeName, '', '由锚点识别或手动指定');
     R('起飞重量', 'mass', c.mass, 'kg', 'W = m·g');
