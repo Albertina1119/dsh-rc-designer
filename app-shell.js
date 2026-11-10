@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '1.8.0';
+  const VERSION = '1.8.1';
   const SCHEMA = 'dsh-project@1';
   const STORE_KEY = 'dsh.rcDesigner.v1';
 
@@ -532,6 +532,15 @@
    * 8. Changelog
    * =================================================================== */
   const CHANGELOG = [
+    {
+      version: '1.8.1', date: '2026-10-15',
+      highlights: [
+        '修复：设置自定义翼型后点「生成方案」无反应 —— airfoil 混入锚点集合，导致 checkAnchorsOrWarn 读取 undefined.dim 抛异常',
+        '新增 realAnchorKeys()：锚点计数、维度统计、步骤条只统计真正的数值锚点，字符串型翼型编号不再计入',
+        '修复模块级状态（STAGE/TAB/VIEWS/VD/CUR_BOM）的 TDZ 时序问题，统一移到脚本顶部用 var 声明',
+        '新增 scrollTop() 安全滚动封装，沙箱或老浏览器缺 window.scrollTo 时不再抛错'
+      ]
+    },
     {
       version: '1.8.0', date: '2026-10-15',
       highlights: [
