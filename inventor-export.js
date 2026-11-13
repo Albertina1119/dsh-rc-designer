@@ -670,18 +670,6 @@
     const xs = pts.map(function (q) { return fmtNum(q[0]); });
     const ys = pts.map(function (q) { return fmtNum(q[1]); });
 
-    /* 把数组字面量折行，适配 VB.NET 的行继续符 */
-    const wrapArr = function (arr) {
-      const lines = [];
-      let cur = '';
-      arr.forEach(function (v, i) {
-        cur += (i ? ', ' : '') + v;
-        if (cur.length > 82) { lines.push(cur + ', _'); cur = ''; }
-      });
-      if (cur) lines.push(cur);
-      return '\n            ' + lines.join('\n            ');
-    };
-
     const L = [];
     const c = function (t) { return "' " + t; };
 
@@ -765,17 +753,20 @@
     L.push('    Return ' + pts.length);
     L.push('End Function');
     L.push('');
+    L.push("' 翼型 x 坐标：放在一行字符串里，避免 VB 把数字开头的续行当成行号标签");
     L.push('Function AFX(i As Integer) As Double');
-    L.push('    Dim a() As Double = { _');
-    L.push('            ' + wrapArr(xs) + '}');
-    L.push('    Return a(i)');
+    L.push('    Dim s As String = "' + xs.join(',') + '"');
+    L.push('    Return System.Double.Parse(s.Split(","c)(i), _');
+    L.push('        System.Globalization.CultureInfo.InvariantCulture)');
     L.push('End Function');
     L.push('');
+    L.push("' 翼型 y 坐标");
     L.push('Function AFY(i As Integer) As Double');
-    L.push('    Dim a() As Double = { _');
-    L.push('            ' + wrapArr(ys) + '}');
-    L.push('    Return a(i)');
+    L.push('    Dim s As String = "' + ys.join(',') + '"');
+    L.push('    Return System.Double.Parse(s.Split(","c)(i), _');
+    L.push('        System.Globalization.CultureInfo.InvariantCulture)');
     L.push('End Function');
+    L.push('');
     L.push('');
     L.push("' ============================================================");
     L.push(c('参数辅助'));
@@ -856,7 +847,11 @@
     L.push('    path.Add(a.Profiles.Item(1))');
     L.push('    path.Add(b.Profiles.Item(1))');
     L.push('    Dim prof As Inventor.Profile = cd.Features.CreateProfile(path)');
-    L.push('    cd.Features.LoftFeatures.Add(Inventor.PartFeatureOperationEnum.kJoinOperation, prof)');
+    L.push("    ' Inventor 2027: LoftFeatures.Add 只接受 LoftDefinition");
+    L.push("    '   Add(Definition As LoftDefinition) As LoftFeature");
+    L.push('    Dim def As Inventor.LoftDefinition = cd.Features.LoftFeatures.CreateLoftDefinition( _');
+    L.push('        prof, Inventor.PartFeatureOperationEnum.kJoinOperation)');
+    L.push('    cd.Features.LoftFeatures.Add(def)');
     L.push('End Sub');
     L.push('');
     L.push("' ============================================================");
