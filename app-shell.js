@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '2.0.0';
+  const VERSION = '2.0.1';
   const SCHEMA = 'dsh-project@1';
   const STORE_KEY = 'dsh.rcDesigner.v1';
 
@@ -532,6 +532,15 @@
    * 8. Changelog
    * =================================================================== */
   const CHANGELOG = [
+    {
+      version: '2.0.1', date: '2026-10-16',
+      highlights: [
+        '修复：建模步骤文档原来是 .md，Windows 双击会弹「选择打开方式」——改为 .html，双击即在浏览器打开',
+        '新增「在页面上查看建模步骤」按钮，不用下载也能看，排版为表格并含打印/存 PDF 按钮',
+        'Markdown 版章节标题恢复为中文数字（二、三、四…）',
+        '建模步骤里的每个数值都直接取自当前方案，不是模板占位'
+      ]
+    },
     {
       version: '2.0.0', date: '2026-10-15',
       highlights: [
