@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '2.2.3';
+  const VERSION = '2.2.4';
   const SCHEMA = 'dsh-project@1';
   const STORE_KEY = 'dsh.rcDesigner.v1';
 
@@ -532,6 +532,15 @@
    * 8. Changelog
    * =================================================================== */
   const CHANGELOG = [
+    {
+      version: '2.2.4', date: '2026-10-16',
+      highlights: [
+        '修复：Plane.Normal 返回 UnitVector，强转 Inventor.Vector 报 E_NOINTERFACE（行 181）',
+        '整个规则改为晚绑定（As Object / IDispatch），规避 iLogic 里这一整类类型转换错误',
+        '与原始 VBA 版的晚绑定行为一致，不再依赖具体接口的 QueryInterface',
+        '21 处 Dim 声明全部改为 As Object，强类型声明 0 处'
+      ]
+    },
     {
       version: '2.2.3', date: '2026-10-16',
       highlights: [
