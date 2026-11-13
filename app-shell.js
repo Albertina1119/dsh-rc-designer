@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '2.2.0';
+  const VERSION = '2.2.1';
   const SCHEMA = 'dsh-project@1';
   const STORE_KEY = 'dsh.rcDesigner.v1';
 
@@ -532,6 +532,16 @@
    * 8. Changelog
    * =================================================================== */
   const CHANGELOG = [
+    {
+      version: '2.2.1', date: '2026-10-16',
+      highlights: [
+        '修复：参数化规则缺少 Sub Main()，粘贴进 iLogic 后第 1 行就报「规则需要 Sub Main() 和 End Sub」',
+        '去掉 Option Explicit（iLogic 会自己包裹规则，加上容易冲突）',
+        '三个入口合并为单一 Sub Main()：首次运行建参数 + 建模，之后运行改参数 + 重建',
+        '新增 PUSH_FROM_WEB 开关：True 用网站值覆盖，False 保留你在 Inventor 里手改的值',
+        '规则头部说明同步改写，只讲一个入口'
+      ]
+    },
     {
       version: '2.2.0', date: '2026-10-16',
       highlights: [
