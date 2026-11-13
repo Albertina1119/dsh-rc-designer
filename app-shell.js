@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '2.2.1';
+  const VERSION = '2.2.2';
   const SCHEMA = 'dsh-project@1';
   const STORE_KEY = 'dsh.rcDesigner.v1';
 
@@ -532,6 +532,15 @@
    * 8. Changelog
    * =================================================================== */
   const CHANGELOG = [
+    {
+      version: '2.2.2', date: '2026-10-16',
+      highlights: [
+        '修复：粘贴后报「行 36 语句在命名空间内无效」—— Const/Dim 不能写在 Sub 外面（iLogic 会把规则包进 Namespace）',
+        '把 16 个参数初值、PUSH_FROM_WEB 开关全部移进 Sub Main() 内部',
+        '翼型坐标从模块级数组改为 AFX/AFY/AFCount 三个函数，避免模块级声明',
+        '结构自检：namespace 层 0 个 Dim/Const/Option，Sub 5/5、Function 7/7 配平'
+      ]
+    },
     {
       version: '2.2.1', date: '2026-10-16',
       highlights: [
