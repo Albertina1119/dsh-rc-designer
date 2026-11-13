@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '1.9.0';
+  const VERSION = '2.0.0';
   const SCHEMA = 'dsh-project@1';
   const STORE_KEY = 'dsh.rcDesigner.v1';
 
@@ -532,6 +532,19 @@
    * 8. Changelog
    * =================================================================== */
   const CHANGELOG = [
+    {
+      version: '2.0.0', date: '2026-10-15',
+      highlights: [
+        'Inventor 功能整体重做：删除本地桥（PowerShell + COM 自动化），彻底不再连接用户的 Inventor',
+        '改为三级递进，每级单独可跑、随时可停：环境自检（零副作用）→ 只画草图（低风险）→ 草图+放样（可选）',
+        '修正上一版 CreateProfile 参数个数错误（传了 2 个参数，API 只接受 1 个）',
+        '不再按 WorkPlanes.Item(2)/(3) 猜平面，改为按 Plane.Normal 的法向识别',
+        '宏里零文件写操作：无 Save / SaveAs / Open / Delete；新文档以不可见方式创建',
+        '硬闸门：Inventor 里有任何文档打开就拒绝运行；出错时只关闭自己创建的文档',
+        '新增零风险路径：手工建模包（参数 JSON + 翼型 DXF + 带具体尺寸的建模步骤）',
+        '全站确认不做任何网络请求（纯静态、纯本地）'
+      ]
+    },
     {
       version: '1.9.0', date: '2026-10-15',
       highlights: [
