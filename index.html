@@ -613,6 +613,18 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
 #view-result .tab.on .cnt{background:rgba(76,201,240,.24);color:var(--acc)}
 #view-result .tab .cnt:empty{display:none}
 /* Inventor 建模面板 */
+#panel-inventor .invblock.drive{border-color:rgba(57,217,138,.5);background:rgba(57,217,138,.07)}
+#panel-inventor .invtag.live{background:rgba(255,255,255,.10);color:var(--tx3)}
+#panel-inventor .drv-row{margin-top:10px}
+#panel-inventor .drv-row label{display:block;font-size:11px;color:var(--tx2);margin-bottom:4px}
+#panel-inventor .drv-row input{width:100%;padding:8px 11px;border:1px solid var(--line);
+  border-radius:7px;background:rgba(0,0,0,.25);color:var(--tx);
+  font:12px ui-monospace,Consolas,monospace}
+#panel-inventor .drvlog{margin-top:10px;padding:10px 12px;border-radius:8px;font-size:11px;
+  line-height:1.8;background:rgba(57,217,138,.07);border:1px solid rgba(57,217,138,.25);
+  color:var(--tx2);white-space:pre-wrap;word-break:break-all;max-height:260px;overflow:auto;
+  font-family:ui-monospace,Consolas,monospace}
+#panel-inventor .drvlog.err{background:rgba(255,92,114,.07);border-color:rgba(255,92,114,.3);color:#ffb3bd}
 #panel-inventor .param-table{margin-top:14px}
 #panel-inventor .pt-title{font-size:11.5px;color:var(--tx2);margin-bottom:7px}
 #panel-inventor .param-table table{width:100%;border-collapse:collapse;font-size:11.5px}
@@ -1204,6 +1216,27 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
           · 下面的宏里没有 打开 / 保存 / 覆盖 / 删除 任何文件的调用<br>
           · 宏运行前会检查：<b>Inventor 里有任何文档打开就拒绝执行</b><br>
           · 三种做法按风险从低到高排列，建议从第一个开始
+        </div>
+
+        <div class="invblock drive">
+          <div class="invhead"><b>一键在 Inventor 中建模</b><span class="invtag live" id="drvTag">桥未连接</span></div>
+          <div class="invstep">
+            <b>这个按钮会真的在 Inventor 里把零件画出来。</b>
+            不需要模板、不需要 iLogic、不需要粘代码。点一下 → 零件自动出现在 Inventor 里并保存成 .ipt。
+          </div>
+          <div class="drv-row">
+            <label>保存到哪个文件夹</label>
+            <input id="drvDir" value="C:\RC模型" spellcheck="false">
+          </div>
+          <div class="btnrow" style="margin-top:9px">
+            <button class="btn sm pri" id="drvBuild">▶ 在 Inventor 中生成零件</button>
+            <button class="btn sm ghost" id="drvDry">试算（不写文件）</button>
+            <button class="btn sm ghost" id="drvConnect">连接本机桥</button>
+          </div>
+          <div class="hint" style="margin-top:8px">
+            前提：先双击桌面的 <b>start-bridge.bat</b>（一次），并让 Inventor 开着且没有任何文档。
+          </div>
+          <div id="drvLog" class="drvlog" style="display:none"></div>
         </div>
 
         <div class="invblock ilogic">
@@ -3453,6 +3486,100 @@ function renderInventor() {
       : '<span class="badge warn">未生成方案</span>';
   }
 }
+
+/* =====================================================================
+ * 一键在 Inventor 中建模（通过本机 PowerShell 桥）
+ * 网站只负责把设计参数发过去，建模完全由桥在 Inventor 里完成。
+ * =================================================================== */
+var DRV_WS = null;
+var DRV_PORT = 8765;
+var DRV_URL = 'ws://127.0.0.1:' + DRV_PORT;
+
+function drvLog(text, isErr) {
+  const el = $('drvLog');
+  if (!el) return;
+  el.style.display = '';
+  el.className = 'drvlog' + (isErr ? ' err' : '');
+  el.textContent = text;
+}
+function drvTag(text, cls) {
+  const el = $('drvTag');
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'invtag' + (cls ? ' ' + cls : '');
+}
+function drvSend(obj) {
+  if (!DRV_WS || DRV_WS.readyState !== 1) { toast('桥没连上，先点「连接本机桥」', 'err'); return false; }
+  DRV_WS.send(JSON.stringify(obj));
+  return true;
+}
+function drvClose() {
+  if (DRV_WS) { try { DRV_WS.close(); } catch (e) {} DRV_WS = null; }
+}
+
+if ($('drvConnect')) $('drvConnect').onclick = function () {
+  drvClose();
+  drvTag('连接中…', 'warn');
+  let ws;
+  try { ws = new WebSocket(DRV_URL); }
+  catch (e) { drvTag('桥未连接', ''); drvLog('WebSocket 创建失败：' + e.message, true); return; }
+  DRV_WS = ws;
+  ws.onopen = function () {
+    drvTag('桥已连接', 'ok');
+    drvLog('已连接 ' + DRV_URL + '，正在查询 Inventor 状态…', false);
+    ws.send(JSON.stringify({ cmd: 'status' }));
+  };
+  ws.onerror = function () {};
+  ws.onclose = function () {
+    if (DRV_WS === ws) { DRV_WS = null; drvTag('桥未连接', ''); }
+  };
+  ws.onmessage = function (ev) {
+    let d;
+    try { d = JSON.parse(ev.data); } catch (e) { return; }
+    if (d.service) {
+      const inv = d.inventor || {};
+      if (inv.connected) {
+        drvTag('桥已连接 · Inventor 就绪', 'ok');
+        drvLog('Inventor ' + (inv.version || '') +
+          '　打开的文档 ' + ((inv.openDocuments || []).length) + ' 个' +
+          (((inv.openDocuments || []).length) ? '（需先关闭，否则会拒绝建模）' : '（可以建模）'), false);
+      } else {
+        drvTag('桥已连接 · Inventor 不可用', 'warn');
+        drvLog((inv.reason || '请先打开 Inventor'), true);
+      }
+      return;
+    }
+    if (d.status === 'ok') {
+      if (d.file) {
+        drvLog('✓ 建模完成，已保存到：\n' + d.file + '\n\n' + (d.log || ''), false);
+        toast('Inventor 已生成零件：' + d.file, 'ok');
+      } else {
+        drvLog('✓ 试算成功（未写文件）\n\n' + (d.log || ''), false);
+        toast('试算成功', 'ok');
+      }
+    } else if (d.status === 'error') {
+      drvLog('✗ ' + (d.message || '未知错误') + '\n\n' + (d.log || ''), true);
+      toast('建模失败：' + (d.message || ''), 'err');
+    }
+  };
+};
+
+function drvDoBuild(dry) {
+  const p = invParams();
+  if (!p) { toast('请先生成方案', 'err'); return; }
+  const dirEl = $('drvDir');
+  const dir = ((dirEl && dirEl.value) || 'C:\\RC模型').replace(/[\\/]+$/, '');
+  const nm = ((p.project || 'RC') + '').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 30);
+  const ts = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15);
+  const saveAs = dir + '\\' + nm + '_' + ts + '.ipt';
+  const msg = { cmd: 'build', params: p, saveAs: saveAs };
+  if (dry) msg.dryRun = true;
+  if (drvSend(msg)) {
+    drvLog('已发送，等 Inventor 干活…\n' + (dry ? '（试算，不写文件）' : ('将保存到：' + saveAs)), false);
+  }
+}
+if ($('drvBuild')) $('drvBuild').onclick = function () { drvDoBuild(false); };
+if ($('drvDry')) $('drvDry').onclick = function () { drvDoBuild(true); };
 
 /* ---- 做法一：参数化自动建模 ---- */
 var INV_PARAM_LABELS = [
