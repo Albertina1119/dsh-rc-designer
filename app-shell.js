@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '2.2.4';
+  const VERSION = '2.3.0';
   const SCHEMA = 'dsh-project@1';
   const STORE_KEY = 'dsh.rcDesigner.v1';
 
@@ -532,6 +532,16 @@
    * 8. Changelog
    * =================================================================== */
   const CHANGELOG = [
+    {
+      version: '2.3.0', date: '2026-10-16',
+      highlights: [
+        '新增「一键在 Inventor 中建模」：网站上点一个按钮，Inventor 自动新建零件并画出机翼/平尾/垂尾实体',
+        '不再需要模板、不再需要 iLogic、不再需要粘贴任何代码',
+        '本地桥改为「从零建模」：新建零件 → 建翼型草图 → 放样 → 另存 .ipt，全程由桥完成',
+        '桥仍保留安全闸门：Inventor 里有文档打开就拒绝执行；不覆盖已存在文件；只监听本机',
+        '保存目录不存在时桥会自动创建'
+      ]
+    },
     {
       version: '2.2.4', date: '2026-10-16',
       highlights: [
