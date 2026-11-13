@@ -613,6 +613,17 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
 #view-result .tab.on .cnt{background:rgba(76,201,240,.24);color:var(--acc)}
 #view-result .tab .cnt:empty{display:none}
 /* Inventor 建模面板 */
+#panel-inventor .invblock.danger{border-color:rgba(255,92,114,.45);background:rgba(255,92,114,.06)}
+#panel-inventor .invtag.err{background:rgba(255,92,114,.2);color:var(--err)}
+#panel-inventor .invwarn{font-size:11.5px;line-height:2;color:#ffb3bd;
+  background:rgba(255,92,114,.08);border-radius:8px;padding:10px 12px;margin-bottom:6px}
+#panel-inventor .invsafe{font-size:11.5px;line-height:2;color:var(--tx2);
+  background:rgba(57,217,138,.07);border:1px solid rgba(57,217,138,.25);
+  border-radius:8px;padding:10px 12px;margin-bottom:12px}
+#panel-inventor .invsafe b{color:var(--ok)}
+#panel-inventor .invsafe code{background:rgba(255,255,255,.08);padding:1px 5px;border-radius:4px}
+#panel-inventor .invsafe kbd{background:rgba(255,255,255,.10);border:1px solid var(--line);
+  border-radius:4px;padding:0 5px;font-size:10.5px;font-family:inherit}
 #panel-inventor .invblock{border:1px solid var(--line);border-radius:10px;padding:13px 15px;
   background:rgba(255,255,255,.02);margin-bottom:12px}
 #panel-inventor .invhead{display:flex;align-items:center;gap:10px;margin-bottom:10px}
@@ -1152,52 +1163,77 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
     </div>
 
     <div class="card" id="cardInv" style="display:none">
-      <h2><span class="n">13</span>Inventor 自动建模<span class="r" id="invStatus">检测中…</span></h2>
+      <h2><span class="n">13</span>Inventor 建模包<span class="r" id="invStatus"></span></h2>
       <div class="body">
-        <div class="hint" style="margin-bottom:11px">
-          浏览器不能直接启动桌面程序（安全限制），所以这里给两条路。
-          <b>两条路用的是同一套参数与同一套建模逻辑，结果一致。</b>
+        <div class="invsafe">
+          <b>先说清楚：这个功能不会碰你的 Inventor</b><br>
+          · 这里所有按钮都只是**下载文件**，不连接、不启动、不控制 Inventor<br>
+          · 没有任何本地服务、没有 PowerShell、没有 COM 自动化<br>
+          · 下面的宏里没有 打开 / 保存 / 覆盖 / 删除 任何文件的调用<br>
+          · 宏运行前会检查：<b>Inventor 里有任何文档打开就拒绝执行</b><br>
+          · 三种做法按风险从低到高排列，建议从第一个开始
         </div>
 
         <div class="invblock">
-          <div class="invhead"><b>路径 A · 零安装</b><span class="invtag ok">推荐先用</span></div>
+          <div class="invhead"><b>做法一 · 手工建模包</b><span class="invtag ok">零风险</span></div>
           <div class="invstep">
-            <div>1. 下载 <code>InventorBuild.bas</code>（VBA 宏）</div>
-            <div>2. Inventor 里按 <kbd>Alt</kbd>+<kbd>F11</kbd> 打开 VBA 编辑器</div>
-            <div>3. 菜单 文件 → 导入文件… → 选中刚下载的 .bas</div>
-            <div>4. 按 <kbd>F5</kbd> 运行 <code>BuildModel</code> → 自动生成 4 个零件</div>
+            下载后你有：参数 JSON + 两个翼型 DXF + 一份带具体数字的建模步骤。
+            全部靠你在 Inventor 里照着点，<b>不运行任何代码</b>。
           </div>
           <div class="btnrow" style="margin-top:9px">
-            <button class="btn sm pri" id="btnInvVba">⤓ 下载 VBA 宏（InventorBuild.bas）</button>
-            <button class="btn sm" id="btnInvJson">⤓ 下载参数（JSON）</button>
-            <button class="btn sm" id="btnInvReadme">⤓ 下载使用说明</button>
+            <button class="btn sm pri" id="btnInvGuide">⤓ 建模步骤（含全部尺寸）</button>
+            <button class="btn sm" id="btnInvDxf">⤓ 翼型 DXF（根弦 + 尖弦）</button>
+            <button class="btn sm" id="btnInvJson">⤓ 参数 JSON</button>
           </div>
         </div>
 
         <div class="invblock">
-          <div class="invhead"><b>路径 B · 一键建模</b><span class="invtag" id="invTagB">需要本地桥</span></div>
+          <div class="invhead"><b>做法二 · 环境自检宏</b><span class="invtag ok">零风险</span></div>
           <div class="invstep">
-            <div>1. 下载 <a href="inventor-bridge.zip" download>inventor-bridge.zip</a> 并解压到任意文件夹</div>
-            <div>2. 双击 <code>启动Inventor桥.bat</code>（会弹一个黑窗口，保持开着）</div>
-            <div>3. 回到这里，状态变成「已连接」后点下面的按钮</div>
+            一个只读的宏：报告 Inventor 版本、模板路径、三个基准面的法向。
+            <b>不创建、不保存任何东西</b>。<br>
+            建议先跑这个，把弹出的报告发我 —— 这样我能在你机器上确认参数，
+            而不是像上次那样靠猜。
           </div>
           <div class="btnrow" style="margin-top:9px">
-            <button class="btn sm pri" id="btnInvBuild" disabled>▶ 直接让 Inventor 建模</button>
-            <button class="btn sm ghost" id="btnInvProbe">重新检测桥</button>
+            <button class="btn sm pri" id="btnInvDiagMacro">⤓ 自检宏（InventorBuild.bas）</button>
           </div>
-          <div id="invLog" class="invlog" style="display:none"></div>
+        </div>
+
+        <div class="invblock">
+          <div class="invhead"><b>做法三 · 草图宏</b><span class="invtag warn">低风险</span></div>
+          <div class="invstep">
+            新建 1 个零件，画出 6 个翼型轮廓草图。
+            <b>不建任何实体特征</b>（不调 CreateProfile、不调放样），
+            所以最容易出错的那几个 API 根本不会执行。<br>
+            画完后你用「放样」点两下就能出实体。
+          </div>
+          <div class="btnrow" style="margin-top:9px">
+            <button class="btn sm" id="btnInvSketchMacro">⤓ 草图宏</button>
+            <button class="btn sm ghost" id="btnInvSolidMacro">⤓ 草图 + 放样宏（中风险）</button>
+          </div>
+        </div>
+
+        <div class="invblock">
+          <div class="invhead"><b>宏的使用方法</b></div>
+          <div class="invstep">
+            <div>1. <b>先把 Inventor 里所有文档关掉</b>（文件 → 全部关闭）—— 不关会被宏拒绝</div>
+            <div>2. 按 <kbd>Alt</kbd>+<kbd>F11</kbd> 打开 VBA 编辑器</div>
+            <div>3. 菜单 文件 → 导入文件… → 选刚下载的 <code>.bas</code></div>
+            <div>4. 按 <kbd>F5</kbd>，选择对应的子过程（<code>InventorDiag</code> / <code>BuildSketches</code> / <code>BuildSolid</code>）</div>
+            <div>5. 随时可按 <kbd>Esc</kbd> 中断</div>
+          </div>
+          <div class="hint" style="margin-top:8px">
+            宏不会保存任何东西。建模结果需要<b>你自己</b>另存为你想要的路径。
+          </div>
         </div>
 
         <div class="invblock">
           <div class="invhead"><b>生成内容</b></div>
           <div class="invgen">
-            <div><b>Wing</b>机翼 · 翼型按根弦/尖弦放样，含上反角 / 后掠角 / 梢根比</div>
-            <div><b>Fuselage</b>机身 · 机头→机翼段→尾段→尾端 四截面锥形放样</div>
-            <div><b>HStab</b>平尾 · 翼型按根弦/尖弦放样</div>
-            <div><b>VStab</b>垂尾 · 翼型按根弦/尖弦放样，含后掠角</div>
-          </div>
-          <div class="hint" style="margin-top:8px">
-            不含倒角与圆角、翼肋与主梁、舵面切割、装配约束、起落架、电机座 —— 这些依赖细节设计，宏不替你决定。
+            <div><b>6 个草图</b>机翼根/尖截面、平尾根/尖截面、垂尾根/尖截面</div>
+            <div><b>放样实体</b>仅「做法三」的第二档才建，共 4 个</div>
+            <div><b>不含</b>倒角/圆角、翼肋、主梁、舵面切割、装配约束、起落架</div>
           </div>
         </div>
       </div>
@@ -3294,13 +3330,11 @@ function showStage(which) {
 }
 
 /* =====================================================================
- * Inventor 自动建模
- *   路径 A：导出 VBA 宏 + 参数，Inventor 里导入运行（零安装）
- *   路径 B：通过本地桥（inventor-bridge）一键建模
+ * Inventor 建模包导出（零 COM、零后端、零文件写操作）
+ *
+ * 这里只做一件事：把参数与宏生成为文件让用户下载。
+ * 不连接 Inventor、不起本地服务、不发任何网络请求。
  * =================================================================== */
-var BRIDGE_PORT = 8731;
-var BRIDGE_OK = false;
-
 function invParams() {
   if (!S.result) return null;
   const plan = S.result.top3[S.selected].plan;
@@ -3317,10 +3351,19 @@ function invParams() {
   });
 }
 
-function invBaseName() {
+function invBase() {
   const p = invParams();
-  const nm = (p && p.project ? p.project : '方案').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40);
-  return nm;
+  return ((p && p.project) || '方案').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 40);
+}
+
+function invSave(name, text, mime) {
+  const blob = new Blob([text], { type: (mime || 'text/plain') + ';charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }
 
 function renderInventor() {
@@ -3331,110 +3374,48 @@ function renderInventor() {
   const p = invParams();
   if ($('invStatus')) {
     $('invStatus').innerHTML = p
-      ? '<span class="badge ok">' + esc(p.airfoilName) + ' · ' + p.fullSpan.toFixed(0) + '×' +
-        p.fuselageLength.toFixed(0) + ' mm</span>'
+      ? '<span class="badge ok">' + esc(p.airfoilName) + ' · ' + p.fullSpan.toFixed(0) +
+        '×' + p.fuselageLength.toFixed(0) + ' mm</span>'
       : '<span class="badge warn">未生成方案</span>';
   }
-  if (!BRIDGE_OK) probeBridge();
 }
 
-/* ---- 路径 A：导出文件 ---- */
-function invDownload(name, text, mime) {
-  const blob = new Blob([text], { type: (mime || 'text/plain') + ';charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  document.body.appendChild(a); a.click();
-  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-}
-if ($('btnInvVba')) $('btnInvVba').onclick = function () {
+/* ---- 做法一：手工包 ---- */
+if ($('btnInvGuide')) $('btnInvGuide').onclick = function () {
   const p = invParams();
   if (!p) { toast('请先生成方案', 'err'); return; }
-  let vba;
-  try { vba = InventorExport.buildVba(p); } catch (e) { toast('宏生成失败：' + e.message, 'err'); return; }
-  invDownload('InventorBuild.bas', '﻿' + vba, 'text/plain');
-  toast('已导出 InventorBuild.bas（Inventor 里 Alt+F11 → 文件 → 导入文件）', 'ok');
+  invSave(invBase() + '_建模步骤.md', InventorExport.buildGuide(p), 'text/markdown');
+  toast('已下载建模步骤（含全部尺寸）', 'ok');
+};
+if ($('btnInvDxf')) $('btnInvDxf').onclick = function () {
+  const p = invParams();
+  if (!p) { toast('请先生成方案', 'err'); return; }
+  const a = InventorExport.airfoilDxf(p, p.rootChord, 'airfoil_root');
+  const b = InventorExport.airfoilDxf(p, p.tipChord, 'airfoil_tip');
+  invSave(a.filename, a.dxf, 'application/dxf');
+  setTimeout(function () { invSave(b.filename, b.dxf, 'application/dxf'); }, 400);
+  toast('已下载 2 个翼型 DXF（根弦 ' + Math.round(p.rootChord) + ' / 尖弦 ' + Math.round(p.tipChord) + ' mm）', 'ok');
 };
 if ($('btnInvJson')) $('btnInvJson').onclick = function () {
   const p = invParams();
   if (!p) { toast('请先生成方案', 'err'); return; }
-  invDownload(invBaseName() + '_inventor_params.json', InventorExport.paramsToJson(p), 'application/json');
-  toast('已导出参数 JSON', 'ok');
+  invSave(invBase() + '_inventor_params.json', InventorExport.paramsToJson(p), 'application/json');
+  toast('已下载参数 JSON', 'ok');
 };
-if ($('btnInvReadme')) $('btnInvReadme').onclick = function () {
+
+/* ---- 做法二 / 三：宏 ---- */
+function invMacro(level, label) {
   const p = invParams();
   if (!p) { toast('请先生成方案', 'err'); return; }
-  invDownload(invBaseName() + '_建模说明.txt', InventorExport.readme(p), 'text/plain');
-  toast('已导出使用说明', 'ok');
-};
-
-/* ---- 路径 B：本地桥 ---- */
-function invSetLog(text, isErr) {
-  const el = $('invLog');
-  if (!el) return;
-  el.style.display = '';
-  el.className = 'invlog' + (isErr ? ' err' : '');
-  el.textContent = text;
+  let vba;
+  try { vba = InventorExport.buildVba(p, { level: level }); }
+  catch (e) { toast('宏生成失败：' + e.message, 'err'); return; }
+  invSave('InventorBuild_' + level + '.bas', vba, 'text/plain');
+  toast('已下载' + label + '（Alt+F11 → 文件 → 导入文件）', 'ok');
 }
-
-function probeBridge() {
-  const url = 'http://127.0.0.1:' + BRIDGE_PORT + '/ping';
-  const ctl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-  const timer = setTimeout(function () { if (ctl) ctl.abort(); }, 2500);
-  fetch(url, { mode: 'cors', cache: 'no-store', signal: ctl ? ctl.signal : undefined })
-    .then(function (r) { return r.json(); })
-    .then(function (j) {
-      clearTimeout(timer);
-      BRIDGE_OK = !!(j && j.ok);
-      if ($('invTagB')) {
-        $('invTagB').textContent = j.inventor ? '已连接 · Inventor 就绪' : '已连接 · 未检测到 Inventor';
-        $('invTagB').className = 'invtag ' + (j.inventor ? 'ok' : 'warn');
-      }
-      if ($('btnInvBuild')) {
-        $('btnInvBuild').disabled = !j.inventor;
-        $('btnInvBuild').title = j.inventor ? '' : ('本机未检测到 Inventor：' + (j.reason || ''));
-      }
-      if (!j.inventor && j.reason) invSetLog('桥已连接，但：' + j.reason, true);
-      else if (j.inventor) invSetLog('桥已连接：' + (j.detail || 'Inventor 就绪'), false);
-    })
-    .catch(function () {
-      clearTimeout(timer);
-      BRIDGE_OK = false;
-      if ($('invTagB')) { $('invTagB').textContent = '桥未连接'; $('invTagB').className = 'invtag'; }
-      if ($('btnInvBuild')) { $('btnInvBuild').disabled = true; }
-    });
-}
-if ($('btnInvProbe')) $('btnInvProbe').onclick = function () { probeBridge(); toast('正在重新检测本地桥…'); };
-
-if ($('btnInvBuild')) $('btnInvBuild').onclick = function () {
-  const p = invParams();
-  if (!p) { toast('请先生成方案', 'err'); return; }
-  const btn = $('btnInvBuild');
-  btn.disabled = true;
-  invSetLog('正在把参数发给本地桥…', false);
-  fetch('http://127.0.0.1:' + BRIDGE_PORT + '/build', {
-    method: 'POST',
-    mode: 'cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(p)
-  }).then(function (r) { return r.json(); }).then(function (j) {
-    btn.disabled = false;
-    if (j && j.ok) {
-      invSetLog('✓ 建模完成。\n\n' + (j.log || ''), false);
-      toast('Inventor 建模完成：Wing / Fuselage / HStab / VStab', 'ok');
-    } else {
-      invSetLog('✗ 建模失败\n\n' + ((j && (j.log || j.error)) || '未知错误') +
-        '\n\n可以改用「路径 A」：下载 VBA 宏，在 Inventor 里导入运行。', true);
-      toast('建模失败：' + ((j && j.error) || '见日志'), 'err');
-    }
-  }).catch(function (e) {
-    btn.disabled = false;
-    invSetLog('✗ 连不上本地桥：' + e.message +
-      '\n\n请确认：① 已解压 inventor-bridge.zip；② 已双击「启动Inventor桥.bat」；③ 黑窗口还开着。\n' +
-      '仍然不行就用「路径 A」下载 VBA 宏。', true);
-    toast('本地桥未连接', 'err');
-  });
-};
+if ($('btnInvDiagMacro')) $('btnInvDiagMacro').onclick = function () { invMacro('diag', '自检宏'); };
+if ($('btnInvSketchMacro')) $('btnInvSketchMacro').onclick = function () { invMacro('sketch', '草图宏'); };
+if ($('btnInvSolidMacro')) $('btnInvSolidMacro').onclick = function () { invMacro('solid', '草图 + 放样宏'); };
 
 /* =====================================================================
  * 制造材料与工艺（按用途推荐机翼材料 + 平尾/垂尾材质）
