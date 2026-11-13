@@ -613,6 +613,13 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
 #view-result .tab.on .cnt{background:rgba(76,201,240,.24);color:var(--acc)}
 #view-result .tab .cnt:empty{display:none}
 /* Inventor 建模面板 */
+#panel-inventor .param-table{margin-top:14px}
+#panel-inventor .pt-title{font-size:11.5px;color:var(--tx2);margin-bottom:7px}
+#panel-inventor .param-table table{width:100%;border-collapse:collapse;font-size:11.5px}
+#panel-inventor .param-table th,#panel-inventor .param-table td{
+  padding:5px 10px;border:1px solid var(--line);text-align:left}
+#panel-inventor .param-table th{background:rgba(255,255,255,.05);font-weight:600}
+#panel-inventor .param-table td.val{font-family:ui-monospace,Consolas,monospace;color:var(--ok)}
 #panel-inventor .invblock.ilogic{border-color:rgba(76,201,240,.45);background:rgba(76,201,240,.06)}
 #panel-inventor .ilogic-head{display:flex;align-items:center;justify-content:space-between;
   margin:12px 0 6px;font-size:11.5px;color:var(--tx2)}
@@ -1200,33 +1207,38 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
         </div>
 
         <div class="invblock ilogic">
-          <div class="invhead"><b>做法一 · iLogic 全自动</b><span class="invtag ok">不用装 VBA</span></div>
+          <div class="invhead"><b>做法一 · 参数化自动建模</b><span class="invtag ok">从零生成实体</span></div>
           <div class="invstep">
-            <b>四个零件全自动生成，你只需要复制 + 粘贴 + 点运行。</b><br>
-            iLogic 用的是 VB.NET，<b>不需要 VBA 组件</b>。新版 Inventor 把 VBA 拆掉了，
-            但 iLogic 仍然随 Inventor Professional 一起安装。
+            <b>不需要模板，不需要提前画实体。</b>
+            规则第一次运行会：① 自动创建 16 个参数 ② 按这些参数从零建出机翼 / 平尾 / 垂尾实体。<br>
+            之后你改任何一个参数（在网站上或 Inventor 里），重跑规则 → <b>模型跟着重建</b>。
           </div>
           <div class="btnrow" style="margin-top:9px">
-            <button class="btn sm pri" id="btnInvILogic">⚡ 生成 iLogic 规则（全自动建模）</button>
-            <button class="btn sm ghost" id="btnInvILogicTip">iLogic 在哪？</button>
+            <button class="btn sm pri" id="btnInvParam">⚡ 生成参数化建模规则</button>
+            <button class="btn sm ghost" id="btnInvParamTip">怎么用？</button>
           </div>
-          <div id="invILogicTip" class="hint" style="display:none;margin-top:8px">
-            打开 Inventor → 顶部选项卡找 <b>「管理」</b>（或「Manage」）→ 里面有
-            <b>「iLogic」</b> 面板 → 点 <b>「添加规则」</b>。<br>
-            如果**没有 iLogic 面板**，说明你装的是 Inventor LT 或未安装 iLogic，
-            请用下面的「做法二 · 手工建模包」。
+          <div id="invParamTip" class="hint" style="display:none;margin-top:8px;line-height:2">
+            <b>只需做一次：</b><br>
+            1. Inventor 里 <b>新建零件</b>（标准 mm 模板），<b>保存</b>成 .ipt<br>
+            2. 顶部 <b>管理</b> 选项卡 → <b>iLogic</b> 面板 → <b>添加规则</b><br>
+            3. 把下面代码全部粘进去 → 确定<br>
+            4. 按 <kbd>F5</kbd> 运行 <code>RC_Init</code> → 参数和实体自动生成<br><br>
+            <b>以后改尺寸：</b>参数表里改 <code>WL_span</code> 等 → 运行 <code>RC_Rebuild</code><br>
+            <b>想全自动：</b>管理 → iLogic → <b>事件触发器</b> → 「参数更改后」→ 选 <code>RC_Rebuild</code><br>
+            <b>从网站推数值：</b>改完网站参数后重新生成规则 → 运行 <code>RC_Push</code>
           </div>
-          <div id="invILogicBox" style="display:none">
+          <div id="invParamBox" style="display:none">
             <div class="ilogic-head">
-              <span>生成的规则（<b id="invILogicSize">—</b>）</span>
-              <button class="btn sm" id="btnInvILogicCopy">📋 复制全部</button>
+              <span>规则代码（<b id="invParamSize">—</b>）</span>
+              <button class="btn sm" id="btnInvParamCopy">📋 复制全部</button>
             </div>
-            <textarea id="invILogicCode" class="ilogic-code" readonly spellcheck="false"></textarea>
-            <div class="invstep" style="margin-top:9px">
-              <div>1. <b>先在 Inventor 里关闭所有文档</b>（文件 → 关闭全部）</div>
-              <div>2. 点「复制全部」，把上面的代码复制走</div>
-              <div>3. Inventor → 管理选项卡 → iLogic 面板 → <b>添加规则</b></div>
-              <div>4. 粘贴进去，确定 → 点 <b>运行</b>，几秒后自动出 4 个零件</div>
+            <textarea id="invParamCode" class="ilogic-code" readonly spellcheck="false"></textarea>
+            <div class="param-table">
+              <div class="pt-title">生成的 16 个参数（在 Inventor「管理 → 参数」里能看到）</div>
+              <table>
+                <tr><th>参数名</th><th>含义</th><th>当前值</th></tr>
+                <tbody id="invParamRows"></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -3442,30 +3454,63 @@ function renderInventor() {
   }
 }
 
-/* ---- 做法一：iLogic 全自动 ---- */
-if ($('btnInvILogicTip')) $('btnInvILogicTip').onclick = function () {
-  const el = $('invILogicTip');
+/* ---- 做法一：参数化自动建模 ---- */
+var INV_PARAM_LABELS = [
+  ['WL_span', '翼展'], ['WL_half', '半翼展'], ['WL_root', '机翼根弦'],
+  ['WL_tip', '机翼尖弦'], ['WL_dihedral', '上反角(度)'], ['WL_sweep', '后掠角(度)'],
+  ['FUS_len', '机身长'], ['FUS_w', '机身宽'], ['FUS_h', '机身高'],
+  ['HT_span', '平尾翼展'], ['HT_root', '平尾根弦'], ['HT_tip', '平尾尖弦'],
+  ['VT_height', '垂尾高度'], ['VT_root', '垂尾根弦'], ['VT_tip', '垂尾尖弦'],
+  ['VT_sweep', '垂尾后掠(度)']
+];
+
+if ($('btnInvParamTip')) $('btnInvParamTip').onclick = function () {
+  const el = $('invParamTip');
   if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
 };
-if ($('btnInvILogic')) $('btnInvILogic').onclick = function () {
+
+if ($('btnInvParam')) $('btnInvParam').onclick = function () {
   const p = invParams();
   if (!p) { toast('请先生成方案', 'err'); return; }
   let code;
-  try { code = InventorExport.buildILogic(p); }
+  try { code = InventorExport.buildParametricRule(p); }
   catch (e) { toast('规则生成失败：' + e.message, 'err'); return; }
-  const box = $('invILogicBox');
-  const ta = $('invILogicCode');
+  const box = $('invParamBox');
+  const ta = $('invParamCode');
   if (!box || !ta) return;
   ta.value = code;
   box.style.display = '';
-  if ($('invILogicSize')) {
-    $('invILogicSize').textContent = (code.length / 1024).toFixed(1) + ' KB · ' + code.split(/\r?\n/).length + ' 行';
+  if ($('invParamSize')) {
+    $('invParamSize').textContent = (code.length / 1024).toFixed(1) + ' KB · ' +
+      code.split(/\r?\n/).length + ' 行';
+  }
+  /* 参数表 */
+  const tb = $('invParamRows');
+  if (tb) {
+    const vals = {
+      WL_span: p.fullSpan, WL_half: p.semiSpan, WL_root: p.rootChord,
+      WL_tip: p.tipChord, WL_dihedral: p.dihedral, WL_sweep: p.sweep,
+      FUS_len: p.fuselageLength, FUS_w: p.bodyMaxWidth, FUS_h: p.bodyMaxHeight,
+      HT_span: p.hStabSpan, HT_root: p.hStabRootChord, HT_tip: p.hStabTipChord,
+      VT_height: p.vStabHeight, VT_root: p.vStabRootChord, VT_tip: p.vStabTipChord,
+      VT_sweep: p.vStabSweep
+    };
+    let html = '';
+    INV_PARAM_LABELS.forEach(function (x) {
+      const v = vals[x[0]];
+      const shown = (/(deg|sweep|dihedral)/i.test(x[1]) || /sweep|dihedral/.test(x[0]))
+        ? v.toFixed(1) + ' °' : v.toFixed(1) + ' mm';
+      html += '<tr><td><code>' + x[0] + '</code></td><td>' + x[1] +
+        '</td><td class="val">' + shown + '</td></tr>';
+    });
+    tb.innerHTML = html;
   }
   toast('规则已生成，点「复制全部」后贴进 Inventor 的 iLogic', 'ok');
   box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 };
-if ($('btnInvILogicCopy')) $('btnInvILogicCopy').onclick = function () {
-  const ta = $('invILogicCode');
+
+if ($('btnInvParamCopy')) $('btnInvParamCopy').onclick = function () {
+  const ta = $('invParamCode');
   if (!ta || !ta.value) { toast('请先生成规则', 'err'); return; }
   const done = function () { toast('已复制，去 Inventor 里粘贴', 'ok'); };
   if (navigator.clipboard && navigator.clipboard.writeText) {
