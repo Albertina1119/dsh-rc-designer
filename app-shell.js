@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '2.0.1';
+  const VERSION = '2.1.0';
   const SCHEMA = 'dsh-project@1';
   const STORE_KEY = 'dsh.rcDesigner.v1';
 
@@ -532,6 +532,16 @@
    * 8. Changelog
    * =================================================================== */
   const CHANGELOG = [
+    {
+      version: '2.1.0', date: '2026-10-16',
+      highlights: [
+        '新增 iLogic 全自动建模（VB.NET）：不需要 VBA 组件，复制粘贴点运行即可生成 4 个零件',
+        '原因：新版 Inventor 不再自带 VBA，Alt+F11 打不开；iLogic 用 .NET，随专业版一起安装',
+        '界面上把「做法一 · iLogic 全自动」放到最前，手工建模包降为兜底方案',
+        'iLogic 规则同样带硬闸门：有任何文档打开就拒绝运行；无 Save / Open / Delete 调用',
+        '规则代码可直接在页面上生成并一键复制，无需下载文件'
+      ]
+    },
     {
       version: '2.0.1', date: '2026-10-16',
       highlights: [
