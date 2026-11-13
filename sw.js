@@ -12,7 +12,7 @@
  *
  * 这样在线用户永远拿到最新代码，离线用户仍有完整可用副本。
  */
-const VERSION = 'v1.9.0';
+const VERSION = 'v2.0.0';
 const CACHE = 'dsh-rc-' + VERSION;
 
 const PRECACHE = [
