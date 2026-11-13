@@ -635,6 +635,325 @@
    * 8. 手工建模指南（零风险路径）
    * =================================================================== */
   /* =====================================================================
+   * 参数化重建规则（iLogic / VB.NET）
+   *
+   * 这是「网站设计 → Inventor 实体」真正的实现方式：
+   *   · 不依赖任何模板文件
+   *   · 不需要你提前画任何实体
+   *   · 第一次运行：自动创建参数 + 从零建出机翼/平尾/垂尾实体
+   *   · 之后每次运行：删掉旧几何、按当前参数值重新建
+   *
+   * 所以：改参数 → 重跑规则 → 模型跟着变。
+   * 配合 iLogic 事件触发器（参数更改后 → 运行本规则），就是实时联动。
+   * =================================================================== */
+  function buildParametricRule(p) {
+    const P = [
+      ['WL_span', p.fullSpan, '翼展'],
+      ['WL_half', p.semiSpan, '半翼展'],
+      ['WL_root', p.rootChord, '机翼根弦'],
+      ['WL_tip', p.tipChord, '机翼尖弦'],
+      ['WL_dihedral', p.dihedral, '上反角(度)'],
+      ['WL_sweep', p.sweep, '后掠角(度)'],
+      ['FUS_len', p.fuselageLength, '机身长'],
+      ['FUS_w', p.bodyMaxWidth, '机身宽'],
+      ['FUS_h', p.bodyMaxHeight, '机身高'],
+      ['HT_span', p.hStabSpan, '平尾翼展'],
+      ['HT_root', p.hStabRootChord, '平尾根弦'],
+      ['HT_tip', p.hStabTipChord, '平尾尖弦'],
+      ['VT_height', p.vStabHeight, '垂尾高度'],
+      ['VT_root', p.vStabRootChord, '垂尾根弦'],
+      ['VT_tip', p.vStabTipChord, '垂尾尖弦'],
+      ['VT_sweep', p.vStabSweep, '垂尾后掠(度)']
+    ];
+
+    const L = [];
+    const c = function (t) { return "' " + t; };
+
+    L.push("' ============================================================");
+    L.push(c('RC 参数化建模规则 (iLogic)'));
+    L.push(c('方案    : ' + asciiOnly(p.project)));
+    L.push(c('翼型    : ' + asciiOnly(p.airfoilName)));
+    L.push(c('校验码  : ' + asciiOnly(p.checksum || 'none')));
+    L.push("' ============================================================");
+    L.push("'");
+    L.push(c('两个子过程，粘贴一次即可，按需运行：'));
+    L.push(c(''));
+    L.push(c('  RC_Init      第一次用：创建全部参数，从零建出实体'));
+    L.push(c('  RC_Rebuild   之后每次：按当前参数值删旧建新'));
+    L.push(c(''));
+    L.push(c('【正确的使用顺序】'));
+    L.push(c('  1. Inventor 里新建一个零件（标准 mm 模板），保存成 .ipt'));
+    L.push(c('  2. 打开 iLogic 面板，添加规则，把本文件全部内容粘贴进去'));
+    L.push(c('  3. 运行 RC_Init  -> 参数和实体都自动建好'));
+    L.push(c('  4. 以后想改尺寸：'));
+    L.push(c('       a) 在 Inventor 参数表里改 WL_span / WL_root 等，然后运行 RC_Rebuild'));
+    L.push(c('       b) 或者让 iLogic 自动跑：管理 > 事件触发器 > 参数更改后 > 选 RC_Rebuild'));
+    L.push(c('  5. 想从网站推数值过来：把网站生成的「参数更新规则」再粘一次运行即可'));
+    L.push("'");
+    L.push(c('【这不会碰你已有的文件】'));
+    L.push(c('  规则只作用于当前这个 .ipt 文档，不打开、不保存、不删除任何其它文件。'));
+    L.push("' ============================================================");
+    L.push('Option Explicit');
+    L.push('');
+    L.push("' ---- 初始值（来自网站的设计结果）----");
+    P.forEach(function (x) {
+      L.push("Dim " + x[0] + "_init As Double = " + fmtNum(x[1]) + "   ' " + x[2]);
+    });
+    L.push('');
+
+    // 翼型点
+    const pts = airfoilPoints(p);
+    const xs = pts.map(function (q) { return fmtNum(q[0]); }).join(', ');
+    const ys = pts.map(function (q) { return fmtNum(q[1]); }).join(', ');
+    const wrap = function (str) {
+      const arr = str.split(', ');
+      const out = [];
+      let cur = '';
+      arr.forEach(function (v, i) {
+        cur += (i ? ', ' : '') + v;
+        if (cur.length > 84) { out.push(cur + ', _'); cur = ''; }
+      });
+      if (cur) out.push(cur);
+      return out.join('\n        ');
+    };
+    L.push("' ---- 翼型坐标（归一化：x 0=前缘 1=后缘）----");
+    L.push("'      " + asciiOnly(p.airfoilName) + "   " + pts.length + " 点");
+    L.push('Dim AFX() As Double = { _');
+    L.push('        ' + wrap(xs) + '}');
+    L.push('Dim AFY() As Double = { _');
+    L.push('        ' + wrap(ys) + '}');
+    L.push('');
+
+    // ===== RC初始化 =====
+    L.push("' ============================================================");
+    L.push(c('第一次运行：创建参数 + 建出实体'));
+    L.push("' ============================================================");
+    L.push('Sub RC_Init()');
+    L.push('    Dim doc As Inventor.PartDocument = ThisDoc.Document');
+    L.push('    If doc Is Nothing Then');
+    L.push('        MessageBox.Show("请先新建一个零件（.ipt），再运行本规则。", "RC")');
+    L.push('        Return');
+    L.push('    End If');
+    L.push('    Dim cd As Inventor.PartComponentDefinition = doc.ComponentDefinition');
+    L.push('');
+    L.push("    ' ---- 1. 创建参数（已存在则跳过，不覆盖你手动改过的值）----");
+    const DEFS = P.map(function (x) {
+      return '    MakeParam(cd, "' + x[0] + '", ' + x[0] + '_init, "' + x[2] + '")';
+    });
+    DEFS.forEach(function (d) { L.push(d); });
+    L.push('');
+    L.push("    ' ---- 2. 建出实体 ----");
+    L.push('    RC_RebuildGeometry(cd)');
+    L.push('');
+    L.push('    doc.Update()');
+    L.push('    MessageBox.Show("参数与实体已生成。" & vbCrLf & _');
+    L.push('        "参数名：WL_span / WL_root / WL_tip / WL_dihedral ..." & vbCrLf & _');
+    L.push('        "改完参数后运行 RC_Rebuild 即可更新模型。", "RC 初始化完成")');
+    L.push('End Sub');
+    L.push('');
+    L.push("' ============================================================");
+    L.push(c('之后每次运行：按当前参数值删旧建新'));
+    L.push("' ============================================================");
+    L.push('Sub RC_Rebuild()');
+    L.push('    Dim doc As Inventor.PartDocument = ThisDoc.Document');
+    L.push('    If doc Is Nothing Then');
+    L.push('        MessageBox.Show("请先打开由 RC_Init 建好的零件，再运行本规则。", "RC")');
+    L.push('        Return');
+    L.push('    End If');
+    L.push('    Dim cd As Inventor.PartComponentDefinition = doc.ComponentDefinition');
+    L.push('');
+    L.push("    ' 参数必须存在，否则提示先初始化");
+    L.push('    If Not ParamExists(cd, "WL_span") Then');
+    L.push('        MessageBox.Show("还没初始化。请先运行 RC_Init。", "RC")');
+    L.push('        Return');
+    L.push('    End If');
+    L.push('');
+    L.push('    RC_RebuildGeometry(cd)');
+    L.push('    doc.Update()');
+    L.push('    MessageBox.Show("模型已按当前参数重建。" & vbCrLf & _');
+    L.push('        "翼展 = " & PNum(cd, "WL_span").ToString("0.0") & " mm" & vbCrLf & _');
+    L.push('        "根弦 = " & PNum(cd, "WL_root").ToString("0.0") & " mm" & vbCrLf & _');
+    L.push('        "上反 = " & PNum(cd, "WL_dihedral").ToString("0.0") & " 度", "RC 重建完成")');
+    L.push('End Sub');
+    L.push('');
+
+    // ===== 参数更新（网站推值）=====
+    L.push("' ============================================================");
+    L.push(c('把参数改成下面这组值，然后重建'));
+    L.push(c('网站改了参数后，重新生成这个规则并运行，即可把新数值推过来'));
+    L.push("' ============================================================");
+    L.push('Sub RC_Push()');
+    L.push('    Dim doc As Inventor.PartDocument = ThisDoc.Document');
+    L.push('    If doc Is Nothing Then Return');
+    L.push('    Dim cd As Inventor.PartComponentDefinition = doc.ComponentDefinition');
+    L.push('    If Not ParamExists(cd, "WL_span") Then');
+    L.push('        MessageBox.Show("还没初始化。请先运行 RC_Init。", "RC")');
+    L.push('        Return');
+    L.push('    End If');
+    const SETS = P.map(function (x) {
+      return '    SetParam(cd, "' + x[0] + '", ' + x[0] + '_init)';
+    });
+    SETS.forEach(function (d) { L.push(d); });
+    L.push('    RC_RebuildGeometry(cd)');
+    L.push('    doc.Update()');
+    L.push('    MessageBox.Show("已写入网站的最新参数并重建模型。", "RC 已同步")');
+    L.push('End Sub');
+    L.push('');
+
+    // ===== 辅助函数 =====
+    L.push("' ---- 辅助：确保参数存在 ----");
+    L.push('Sub MakeParam(cd As Inventor.PartComponentDefinition, nm As String, v As Double, cn As String)');
+    L.push('    If ParamExists(cd, nm) Then Return');
+    L.push('    Try');
+    L.push('        cd.Parameters.UserParameters.AddByExpression(nm, v.ToString("0.0000") & " mm", "mm")');
+    L.push('    Catch');
+    L.push('    End Try');
+    L.push('End Sub');
+    L.push('');
+    L.push("' ---- 辅助：判断参数是否存在 ----");
+    L.push('Function ParamExists(cd As Inventor.PartComponentDefinition, nm As String) As Boolean');
+    L.push('    Try');
+    L.push('        Dim p As Inventor.Parameter = cd.Parameters.Item(nm)');
+    L.push('        Return p IsNot Nothing');
+    L.push('    Catch');
+    L.push('        Return False');
+    L.push('    End Try');
+    L.push('End Function');
+    L.push('');
+
+    L.push("' ---- 辅助：写参数值 ----");
+    L.push('Sub SetParam(cd As Inventor.PartComponentDefinition, nm As String, v As Double)');
+    L.push('    Try');
+    L.push('        cd.Parameters.Item(nm).Expression = v.ToString("0.0000") & " mm"');
+    L.push('    Catch');
+    L.push('    End Try');
+    L.push('End Sub');
+    L.push('');
+    L.push("' ---- 辅助：取参数数值（单位 mm 的数值部分）----");
+    L.push('Function PNum(cd As Inventor.PartComponentDefinition, nm As String) As Double');
+    L.push('    Try');
+    L.push('        Return cd.Parameters.Item(nm).Expression.Replace("mm", "").Trim()');
+    L.push('    Catch');
+    L.push('        Return 0');
+    L.push('    End Try');
+    L.push('End Function');
+    L.push('');
+
+    // ===== 几何重建 =====
+    L.push("' ============================================================");
+    L.push(c('核心：删除旧几何，按当前参数重建'));
+    L.push("' ============================================================");
+    L.push('Sub RC_RebuildGeometry(cd As Inventor.PartComponentDefinition)');
+    L.push('    Dim tg As Inventor.TransientGeometry = ThisApplication.TransientGeometry');
+    L.push('');
+    L.push("    ' ---- 1. 清掉旧几何 ----");
+    L.push('    Do While cd.Features.Count > 0');
+    L.push('        cd.Features.Item(1).Delete()');
+    L.push('    Loop');
+    L.push('    Do While cd.Sketches.Count > 0');
+    L.push('        cd.Sketches.Item(1).Delete()');
+    L.push('    Loop');
+    L.push("    ' 删掉之前加的偏移工作平面（保留 3 个基准面）");
+    L.push('    Dim i As Integer');
+    L.push('    For i = cd.WorkPlanes.Count To 4 Step -1');
+    L.push('        Try');
+    L.push('            cd.WorkPlanes.Item(i).Delete()');
+    L.push('        Catch');
+    L.push('        End Try');
+    L.push('    Next');
+    L.push('');
+    L.push("    ' ---- 2. 找基准面（按法向，不靠索引）----");
+    L.push('    Dim plSpan As Inventor.WorkPlane = PickPlane(cd, "Y")');
+    L.push('    Dim plUp As Inventor.WorkPlane = PickPlane(cd, "Z")');
+    L.push('    If plSpan Is Nothing Then');
+    L.push('        MessageBox.Show("找不到法向为 Y 的基准面，无法建模。", "RC")');
+    L.push('        Return');
+    L.push('    End If');
+    L.push('');
+    L.push("    ' ---- 3. 机翼 ----");
+    L.push('    Dim wRoot As Double = PNum(cd, "WL_root")');
+    L.push('    Dim wTip As Double = PNum(cd, "WL_tip")');
+    L.push('    Dim wHalf As Double = PNum(cd, "WL_half")');
+    L.push('    Dim dih As Double = PNum(cd, "WL_dihedral")');
+    L.push('    Dim swp As Double = PNum(cd, "WL_sweep")');
+    L.push('    Dim s1 As Inventor.PlanarSketch = SketchAF(cd, plSpan, wRoot, 0, 0)');
+    L.push('    Dim tp As Inventor.WorkPlane = cd.WorkPlanes.AddByPlaneAndOffset(plSpan, wHalf)');
+    L.push('    tp.Visible = False');
+    L.push('    Dim rise As Double = wHalf * Math.Tan(dih * Math.PI / 180)');
+    L.push('    Dim shift As Double = wHalf * Math.Tan(swp * Math.PI / 180)');
+    L.push('    Dim s2 As Inventor.PlanarSketch = SketchAF(cd, tp, wTip, rise, shift)');
+    L.push('    LoftTwo(cd, s1, s2)');
+    L.push('');
+    L.push("    ' ---- 4. 平尾 ----");
+    L.push('    Dim hRoot As Double = PNum(cd, "HT_root")');
+    L.push('    Dim hTip As Double = PNum(cd, "HT_tip")');
+    L.push('    Dim hSpan As Double = PNum(cd, "HT_span")');
+    L.push('    Dim h1 As Inventor.PlanarSketch = SketchAF(cd, plSpan, hRoot, 0, 0)');
+    L.push('    Dim hp As Inventor.WorkPlane = cd.WorkPlanes.AddByPlaneAndOffset(plSpan, hSpan / 2)');
+    L.push('    hp.Visible = False');
+    L.push('    Dim h2 As Inventor.PlanarSketch = SketchAF(cd, hp, hTip, 0, 0)');
+    L.push('    LoftTwo(cd, h1, h2)');
+    L.push('');
+    L.push("    ' ---- 5. 垂尾 ----");
+    L.push('    If plUp IsNot Nothing Then');
+    L.push('        Dim vRoot As Double = PNum(cd, "VT_root")');
+    L.push('        Dim vTip As Double = PNum(cd, "VT_tip")');
+    L.push('        Dim vH As Double = PNum(cd, "VT_height")');
+    L.push('        Dim vSw As Double = PNum(cd, "VT_sweep")');
+    L.push('        Dim v1 As Inventor.PlanarSketch = SketchAF(cd, plUp, vRoot, 0, 0)');
+    L.push('        Dim vp As Inventor.WorkPlane = cd.WorkPlanes.AddByPlaneAndOffset(plUp, vH)');
+    L.push('        vp.Visible = False');
+    L.push('        Dim vShift As Double = vH * Math.Tan(vSw * Math.PI / 180)');
+    L.push('        Dim v2 As Inventor.PlanarSketch = SketchAF(cd, vp, vTip, 0, vShift)');
+    L.push('        LoftTwo(cd, v1, v2)');
+    L.push('    End If');
+    L.push('End Sub');
+    L.push('');
+
+    // ===== 几何辅助 =====
+    L.push("' ---- 按法向找基准面 ----");
+    L.push('Function PickPlane(cd As Inventor.PartComponentDefinition, ax As String) As Inventor.WorkPlane');
+    L.push('    For i As Integer = 1 To 3');
+    L.push('        Dim pl As Inventor.WorkPlane = cd.WorkPlanes.Item(i)');
+    L.push('        Dim nv As Inventor.Vector = pl.Plane.Normal');
+    L.push('        If ax = "X" AndAlso Math.Abs(nv.X) > 0.9 Then Return pl');
+    L.push('        If ax = "Y" AndAlso Math.Abs(nv.Y) > 0.9 Then Return pl');
+    L.push('        If ax = "Z" AndAlso Math.Abs(nv.Z) > 0.9 Then Return pl');
+    L.push('    Next');
+    L.push('    Return Nothing');
+    L.push('End Function');
+    L.push('');
+    L.push("' ---- 画一个闭合翼型轮廓 ----");
+    L.push('Function SketchAF(cd As Inventor.PartComponentDefinition, pl As Inventor.WorkPlane, _');
+    L.push('                  chord As Double, yShift As Double, xShift As Double) As Inventor.PlanarSketch');
+    L.push('    Dim tg As Inventor.TransientGeometry = ThisApplication.TransientGeometry');
+    L.push('    Dim sk As Inventor.PlanarSketch = cd.Sketches.Add(pl)');
+    L.push('    Dim n As Integer = AFX.Length');
+    L.push('    For i As Integer = 0 To n - 2');
+    L.push('        sk.SketchLines.AddByTwoPoints( _');
+    L.push('            tg.CreatePoint2d(xShift + AFX(i) * chord, yShift + AFY(i) * chord), _');
+    L.push('            tg.CreatePoint2d(xShift + AFX(i + 1) * chord, yShift + AFY(i + 1) * chord))');
+    L.push('    Next');
+    L.push('    sk.SketchLines.AddByTwoPoints( _');
+    L.push('        tg.CreatePoint2d(xShift + AFX(n - 1) * chord, yShift + AFY(n - 1) * chord), _');
+    L.push('        tg.CreatePoint2d(xShift + AFX(0) * chord, yShift + AFY(0) * chord))');
+    L.push('    Return sk');
+    L.push('End Function');
+    L.push('');
+    L.push("' ---- 两个截面放样 ----");
+    L.push('Sub LoftTwo(cd As Inventor.PartComponentDefinition, _');
+    L.push('            a As Inventor.PlanarSketch, b As Inventor.PlanarSketch)');
+    L.push('    Dim path As Inventor.ProfilePath = cd.Sketches.CreateProfile');
+    L.push('    path.Add(a.Profiles.Item(1))');
+    L.push('    path.Add(b.Profiles.Item(1))');
+    L.push('    Dim prof As Inventor.Profile = cd.Features.CreateProfile(path)');
+    L.push('    cd.Features.LoftFeatures.Add(Inventor.PartFeatureOperationEnum.kJoinOperation, prof)');
+    L.push('End Sub');
+
+    return L.join('\r\n');
+  }
+
+  /* =====================================================================
    * iLogic 规则（VB.NET）
    *   为什么加这条：新版 Inventor 不再自带 VBA，Alt+F11 打不开。
    *   iLogic 用 .NET，不需要 VBA 组件，随 Inventor Professional 一起装。
@@ -1123,6 +1442,7 @@
     buildGuide: buildGuide,
     buildGuideHtml: buildGuideHtml,
     buildILogic: buildILogic,
+    buildParametricRule: buildParametricRule,
     guideData: guideData,
     paramsToJson: paramsToJson,
     airfoilDxf: airfoilDxf,
