@@ -613,6 +613,24 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
 #view-result .tab.on .cnt{background:rgba(76,201,240,.24);color:var(--acc)}
 #view-result .tab .cnt:empty{display:none}
 /* Inventor 建模面板 */
+#panel-inventor .invguide{margin-top:12px;background:#fff;border:1px solid var(--line);
+  border-radius:10px;padding:6px 20px 20px;color:#1c2024;max-height:620px;overflow:auto}
+#panel-inventor .invguide .sub{color:#6b7480;font-size:12px;margin-bottom:16px}
+#panel-inventor .invguide h1{font-size:19px;margin:14px 0 4px;color:#0d3b66}
+#panel-inventor .invguide h2{font-size:15px;margin:22px 0 9px;padding-bottom:6px;
+  border-bottom:2px solid #e8ecf1;color:#0d3b66}
+#panel-inventor .invguide table{width:100%;border-collapse:collapse;font-size:12px;margin:8px 0}
+#panel-inventor .invguide th,#panel-inventor .invguide td{padding:6px 10px;
+  border:1px solid #e2e7ed;text-align:left}
+#panel-inventor .invguide th{background:#f0f4f8;font-weight:600;width:40%;color:#1c2024}
+#panel-inventor .invguide td.val{font-family:ui-monospace,Consolas,monospace;
+  font-weight:600;color:#0b6b3a}
+#panel-inventor .invguide td.eng{color:#95a1ad;font-size:11.5px}
+#panel-inventor .invguide ol{padding-left:20px;margin:6px 0}
+#panel-inventor .invguide li{margin:4px 0;font-size:12.5px;line-height:1.9}
+#panel-inventor .invguide code{background:#eef3f8;color:#0550a0;padding:0 5px;
+  border-radius:3px;font-family:ui-monospace,Consolas,monospace;font-size:11.5px}
+#panel-inventor .invguide .print{display:none}
 #panel-inventor .invblock.danger{border-color:rgba(255,92,114,.45);background:rgba(255,92,114,.06)}
 #panel-inventor .invtag.err{background:rgba(255,92,114,.2);color:var(--err)}
 #panel-inventor .invwarn{font-size:11.5px;line-height:2;color:#ffb3bd;
@@ -1181,10 +1199,15 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
             全部靠你在 Inventor 里照着点，<b>不运行任何代码</b>。
           </div>
           <div class="btnrow" style="margin-top:9px">
-            <button class="btn sm pri" id="btnInvGuide">⤓ 建模步骤（含全部尺寸）</button>
+            <button class="btn sm pri" id="btnInvView">👁 在页面上查看建模步骤</button>
+            <button class="btn sm" id="btnInvGuide">⤓ 下载建模步骤（HTML）</button>
             <button class="btn sm" id="btnInvDxf">⤓ 翼型 DXF（根弦 + 尖弦）</button>
             <button class="btn sm" id="btnInvJson">⤓ 参数 JSON</button>
           </div>
+          <div class="hint" style="margin-top:7px">
+            下载的是 <code>.html</code> 文件，<b>双击就能在浏览器里打开</b>，排版成表格，还能打印成 PDF。
+          </div>
+          <div id="invGuideBox" class="invguide" style="display:none"></div>
         </div>
 
         <div class="invblock">
@@ -3384,8 +3407,36 @@ function renderInventor() {
 if ($('btnInvGuide')) $('btnInvGuide').onclick = function () {
   const p = invParams();
   if (!p) { toast('请先生成方案', 'err'); return; }
-  invSave(invBase() + '_建模步骤.md', InventorExport.buildGuide(p), 'text/markdown');
-  toast('已下载建模步骤（含全部尺寸）', 'ok');
+  invSave(invBase() + '_建模步骤.html', InventorExport.buildGuideHtml(p), 'text/html');
+  toast('已下载 HTML 建模步骤（双击即可在浏览器打开）', 'ok');
+};
+
+/* 页面内直接查看，不用下载 */
+if ($('btnInvView')) $('btnInvView').onclick = function () {
+  const p = invParams();
+  if (!p) { toast('请先生成方案', 'err'); return; }
+  const box = $('invGuideBox');
+  if (!box) return;
+  if (box.style.display !== 'none') {
+    box.style.display = 'none';
+    $('btnInvView').textContent = '👁 在页面上查看建模步骤';
+    return;
+  }
+  let html;
+  try { html = InventorExport.buildGuideHtml(p); }
+  catch (e) { toast('生成失败：' + e.message, 'err'); return; }
+  /* 取出 <body> 内部内容，塞进本页，避免嵌套整套 html */
+  const m = /<body[^>]*>([\s\S]*)<\/body>/i.exec(html);
+  let inner = m ? m[1] : html;
+  inner = inner.replace(/<button class="print"[\s\S]*?<\/button>/i, '');
+  box.innerHTML = inner;
+  box.style.display = '';
+  const wrap = box.querySelector('.wrap');
+  if (wrap) { wrap.style.boxShadow = 'none'; wrap.style.padding = '0'; wrap.style.background = 'transparent'; }
+  const safe = box.querySelector('.safe');
+  if (safe) { safe.style.display = 'none'; }
+  $('btnInvView').textContent = '🔼 收起建模步骤';
+  toast('建模步骤已展开在下方', 'ok');
 };
 if ($('btnInvDxf')) $('btnInvDxf').onclick = function () {
   const p = invParams();
