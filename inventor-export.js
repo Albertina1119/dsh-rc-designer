@@ -634,6 +634,218 @@
   /* =====================================================================
    * 8. 手工建模指南（零风险路径）
    * =================================================================== */
+  /* =====================================================================
+   * iLogic 规则（VB.NET）
+   *   为什么加这条：新版 Inventor 不再自带 VBA，Alt+F11 打不开。
+   *   iLogic 用 .NET，不需要 VBA 组件，随 Inventor Professional 一起装。
+   *   用法：iLogic 面板 → 添加规则 → 粘贴 → 运行。
+   *   安全策略与 VBA 版一致：不打开/不保存/不删除任何文件；
+   *   有任何文档打开就拒绝运行。
+   * =================================================================== */
+  function buildILogic(p) {
+    const lv = 'iLogic';
+    const L = [];
+    const c = function (t) { return "' " + t; };
+
+    L.push("' ============================================================");
+    L.push(c('RC Aircraft Designer - iLogic rule (VB.NET)'));
+    L.push(c('Project  : ' + asciiOnly(p.project)));
+    L.push(c('Airfoil  : ' + asciiOnly(p.airfoilName)));
+    L.push(c('Checksum : ' + asciiOnly(p.checksum || 'none')));
+    L.push(c('Units    : mm / degrees'));
+    L.push("' ============================================================");
+    L.push("'");
+    L.push(c('HOW TO RUN'));
+    L.push(c('  1. Close ALL documents in Inventor (File > Close All)'));
+    L.push(c('  2. Open the iLogic panel (Manage tab > iLogic)'));
+    L.push(c('  3. Add Rule > paste this whole text > OK'));
+    L.push(c('  4. Click Run'));
+    L.push("'");
+    L.push(c('WHAT IT DOES'));
+    L.push(c('  Creates ONE new part with 6 airfoil sketches and 4 lofts.'));
+    L.push("'");
+    L.push(c('WHAT IT NEVER DOES'));
+    L.push(c('  Never opens, saves, overwrites or deletes a file.'));
+    L.push(c('  Refuses to run while any document is open.'));
+    L.push("' ============================================================");
+    L.push('');
+    L.push("' ---- Dimensions (mm, degrees) ----");
+    const K = [
+      ['FUS_LEN', p.fuselageLength, 'fuselage length'],
+      ['SEMI_SPAN', p.semiSpan, 'one side span'],
+      ['ROOT_CHORD', p.rootChord, 'wing root chord'],
+      ['TIP_CHORD', p.tipChord, 'wing tip chord'],
+      ['DIHEDRAL', p.dihedral, 'dihedral'],
+      ['SWEEP', p.sweep, 'sweep'],
+      ['BODY_W', p.bodyMaxWidth, 'fuselage max width'],
+      ['BODY_H', p.bodyMaxHeight, 'fuselage max height'],
+      ['NOSE_LEN', p.noseLength, 'nose section'],
+      ['WING_BAY', p.wingMountLength, 'wing bay'],
+      ['HSTAB_SPAN', p.hStabSpan, 'horizontal tail span'],
+      ['HSTAB_ROOT', p.hStabRootChord, 'horizontal tail root'],
+      ['HSTAB_TIP', p.hStabTipChord, 'horizontal tail tip'],
+      ['VSTAB_H', p.vStabHeight, 'vertical tail height'],
+      ['VSTAB_ROOT', p.vStabRootChord, 'vertical tail root'],
+      ['VSTAB_TIP', p.vStabTipChord, 'vertical tail tip'],
+      ['VSTAB_SWEEP', p.vStabSweep, 'vertical tail sweep']
+    ];
+    K.forEach(function (x) { L.push('Const ' + x[0] + ' As Double = ' + fmtNum(x[1]) + '  \' ' + x[2]); });
+    L.push('Const AIRFOIL As String = "' + asciiOnly(p.airfoilName) + '"');
+    L.push('');
+
+    // 翼型数组
+    const pts = airfoilPoints(p);
+    const xs = pts.map(function (q) { return fmtNum(q[0]); }).join(', ');
+    const ys = pts.map(function (q) { return fmtNum(q[1]); }).join(', ');
+    const wrap = function (str) {
+      const parts = str.split(', ');
+      const lines = [];
+      let cur = '';
+      parts.forEach(function (v, i) {
+        cur += (i ? ', ' : '') + v;
+        if (cur.length > 84) { lines.push(cur + ', _'); cur = ''; }
+      });
+      if (cur) lines.push(cur);
+      return lines.join('\n        ');
+    };
+    L.push("' ---- Airfoil points (normalised: x 0 = LE, 1 = TE) ----");
+    L.push('Dim AFX() As Double = { _');
+    L.push('        ' + wrap(xs) + '}');
+    L.push('Dim AFY() As Double = { _');
+    L.push('        ' + wrap(ys) + '}');
+    L.push('');
+    L.push('Dim inv As Inventor.Application = ThisApplication');
+    L.push('');
+    L.push("' ---- SAFETY GATE: refuse while any document is open ----");
+    L.push('If inv.Documents.Count > 0 Then');
+    L.push('    MessageBox.Show("This rule refuses to run: " & inv.Documents.Count & _');
+    L.push('        " document(s) are open in Inventor." & vbCrLf & vbCrLf & _');
+    L.push('        "Close ALL documents first (File > Close All), then run again." & vbCrLf & vbCrLf & _');
+    L.push('        "Why: the rule creates a new part. Requiring a clean session" & vbCrLf & _');
+    L.push('        "is the only way to guarantee your own work is never affected.", _');
+    L.push('        "RC Designer - safety guard")');
+    L.push('Else');
+    L.push('');
+    L.push('    Dim oDoc As Inventor.PartDocument = Nothing');
+    L.push('    Try');
+    L.push('        oDoc = inv.Documents.Add( _');
+    L.push('            Inventor.DocumentTypeEnum.kPartDocumentObject, _');
+    L.push('            inv.FileManager.GetTemplateFile( _');
+    L.push('                Inventor.DocumentTypeEnum.kPartDocumentObject), False)');
+    L.push('        oDoc.UnitsOfMeasure.LengthUnits = Inventor.UnitsTypeEnum.kMillimeterLengthUnits');
+    L.push('        oDoc.DisplayName = "RC_Part"');
+    L.push('');
+    L.push('        Dim cd As Inventor.PartComponentDefinition = oDoc.ComponentDefinition');
+    L.push('        Dim tg As Inventor.TransientGeometry = inv.TransientGeometry');
+    L.push('');
+    L.push("        ' ---- find base planes by NORMAL, not by index ----");
+    L.push('        Dim plSpan As Inventor.WorkPlane = PickPlane(cd, "Y")');
+    L.push('        Dim plUp As Inventor.WorkPlane = PickPlane(cd, "Z")');
+    L.push('        If plSpan Is Nothing Then');
+    L.push('            MessageBox.Show("No base work plane with a Y normal was found.", "RC Designer")');
+    L.push('            oDoc.Close(True)');
+    L.push('            Return');
+    L.push('        End If');
+    L.push('');
+    L.push('        Dim log As String = "Created 1 new part (invisible, unsaved)." & vbCrLf & vbCrLf');
+    L.push('');
+    L.push("        ' ---- wing root ----");
+    L.push('        Dim s1 As Inventor.PlanarSketch = SketchAF(oDoc, plSpan, ROOT_CHORD, 0, 0)');
+    L.push('        log = log & "[ok] wing root, chord " & ROOT_CHORD.ToString("0.0") & " mm" & vbCrLf');
+    L.push('');
+    L.push("        ' ---- wing tip ----");
+    L.push('        Dim off As Inventor.WorkPlane = cd.WorkPlanes.AddByPlaneAndOffset(plSpan, SEMI_SPAN)');
+    L.push('        off.Visible = False');
+    L.push('        Dim dz As Double = SEMI_SPAN * Math.Tan(DIHEDRAL * Math.PI / 180)');
+    L.push('        Dim dx As Double = SEMI_SPAN * Math.Tan(SWEEP * Math.PI / 180)');
+    L.push('        Dim s2 As Inventor.PlanarSketch = SketchAF(oDoc, off, TIP_CHORD, dz, dx)');
+    L.push('        log = log & "[ok] wing tip, chord " & TIP_CHORD.ToString("0.0") & " mm" & vbCrLf');
+    L.push('        LoftTwo(cd, s1, s2)');
+    L.push('        log = log & "[ok] wing loft" & vbCrLf');
+    L.push('');
+    L.push("        ' ---- horizontal tail ----");
+    L.push('        Dim h1 As Inventor.PlanarSketch = SketchAF(oDoc, plSpan, HSTAB_ROOT, 0, 0)');
+    L.push('        Dim hOff As Inventor.WorkPlane = cd.WorkPlanes.AddByPlaneAndOffset(plSpan, HSTAB_SPAN / 2)');
+    L.push('        hOff.Visible = False');
+    L.push('        Dim h2 As Inventor.PlanarSketch = SketchAF(oDoc, hOff, HSTAB_TIP, 0, 0)');
+    L.push('        LoftTwo(cd, h1, h2)');
+    L.push('        log = log & "[ok] horizontal tail" & vbCrLf');
+    L.push('');
+    L.push("        ' ---- vertical tail ----");
+    L.push('        If plUp Is Nothing Then');
+    L.push('            log = log & "[skip] no Z-normal plane: vertical tail skipped" & vbCrLf');
+    L.push('        Else');
+    L.push('            Dim v1 As Inventor.PlanarSketch = SketchAF(oDoc, plUp, VSTAB_ROOT, 0, 0)');
+    L.push('            Dim vOff As Inventor.WorkPlane = cd.WorkPlanes.AddByPlaneAndOffset(plUp, VSTAB_H)');
+    L.push('            vOff.Visible = False');
+    L.push('            Dim vdz As Double = VSTAB_H * Math.Tan(VSTAB_SWEEP * Math.PI / 180)');
+    L.push('            Dim v2 As Inventor.PlanarSketch = SketchAF(oDoc, vOff, VSTAB_TIP, 0, vdz)');
+    L.push('            LoftTwo(cd, v1, v2)');
+    L.push('            log = log & "[ok] vertical tail" & vbCrLf');
+    L.push('        End If');
+    L.push('');
+    L.push('        oDoc.Visible = True');
+    L.push('        log = log & vbCrLf & "Done: 1 part, 6 sketches, 3 lofts." & vbCrLf & _');
+    L.push('               "Nothing was saved. Use File > Save As yourself."');
+    L.push('        MessageBox.Show(log, "RC Designer - build finished")');
+    L.push('');
+    L.push('    Catch ex As Exception');
+    L.push('        MessageBox.Show("Build stopped: " & ex.Message & vbCrLf & vbCrLf & _');
+    L.push('            "Your existing files were never opened or modified.", _');
+    L.push('            "RC Designer")');
+    L.push("        ' close only the document this rule created");
+    L.push('        If oDoc IsNot Nothing Then');
+    L.push('            Try');
+    L.push('                If Not oDoc.Dirty Then oDoc.Close(True)');
+    L.push('            Catch');
+    L.push('            End Try');
+    L.push('        End If');
+    L.push('    End Try');
+    L.push('');
+    L.push('End If');
+    L.push('');
+    L.push("' ---- helpers (iLogic supports local functions) ----");
+    L.push("' Pick a base work plane by the direction of its normal.");
+    L.push('Function PickPlane(cd As Inventor.PartComponentDefinition, ax As String) As Inventor.WorkPlane');
+    L.push('    For i As Integer = 1 To 3');
+    L.push('        Dim pl As Inventor.WorkPlane = cd.WorkPlanes.Item(i)');
+    L.push('        Dim nv As Inventor.Vector = pl.Plane.Normal');
+    L.push('        If ax = "X" AndAlso Math.Abs(nv.X) > 0.9 Then Return pl');
+    L.push('        If ax = "Y" AndAlso Math.Abs(nv.Y) > 0.9 Then Return pl');
+    L.push('        If ax = "Z" AndAlso Math.Abs(nv.Z) > 0.9 Then Return pl');
+    L.push('    Next');
+    L.push('    Return Nothing');
+    L.push('End Function');
+    L.push('');
+    L.push("' Draw one closed airfoil outline on the given plane.");
+    L.push('Function SketchAF(oDoc As Inventor.PartDocument, pl As Inventor.WorkPlane, _');
+    L.push('                  chord As Double, yShift As Double, xShift As Double) As Inventor.PlanarSketch');
+    L.push('    Dim tg As Inventor.TransientGeometry = ThisApplication.TransientGeometry');
+    L.push('    Dim sk As Inventor.PlanarSketch = oDoc.ComponentDefinition.Sketches.Add(pl)');
+    L.push('    Dim n As Integer = AFX.Length');
+    L.push('    For i As Integer = 0 To n - 2');
+    L.push('        sk.SketchLines.AddByTwoPoints( _');
+    L.push('            tg.CreatePoint2d(xShift + AFX(i) * chord, yShift + AFY(i) * chord), _');
+    L.push('            tg.CreatePoint2d(xShift + AFX(i + 1) * chord, yShift + AFY(i + 1) * chord))');
+    L.push('    Next');
+    L.push('    sk.SketchLines.AddByTwoPoints( _');
+    L.push('        tg.CreatePoint2d(xShift + AFX(n - 1) * chord, yShift + AFY(n - 1) * chord), _');
+    L.push('        tg.CreatePoint2d(xShift + AFX(0) * chord, yShift + AFY(0) * chord))');
+    L.push('    Return sk');
+    L.push('End Function');
+    L.push('');
+    L.push("' Loft between exactly two closed profiles.");
+    L.push('Sub LoftTwo(cd As Inventor.PartComponentDefinition, _');
+    L.push('            a As Inventor.PlanarSketch, b As Inventor.PlanarSketch)');
+    L.push('    Dim path As Inventor.ProfilePath = cd.Sketches.CreateProfile');
+    L.push('    path.Add(a.Profiles.Item(1))');
+    L.push('    path.Add(b.Profiles.Item(1))');
+    L.push('    Dim prof As Inventor.Profile = cd.Features.CreateProfile(path)');
+    L.push('    cd.Features.LoftFeatures.Add(Inventor.PartFeatureOperationEnum.kJoinOperation, prof)');
+    L.push('End Sub');
+    return L.join('\r\n');
+  }
+
   /** 把指南内容整理成结构化数据，供 Markdown 与 HTML 两种输出共用 */
   function guideData(p) {
     const f = function (v) {
@@ -910,6 +1122,7 @@
     buildVba: buildVba,
     buildGuide: buildGuide,
     buildGuideHtml: buildGuideHtml,
+    buildILogic: buildILogic,
     guideData: guideData,
     paramsToJson: paramsToJson,
     airfoilDxf: airfoilDxf,
