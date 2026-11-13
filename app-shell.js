@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '1.8.1';
+  const VERSION = '1.9.0';
   const SCHEMA = 'dsh-project@1';
   const STORE_KEY = 'dsh.rcDesigner.v1';
 
@@ -532,6 +532,16 @@
    * 8. Changelog
    * =================================================================== */
   const CHANGELOG = [
+    {
+      version: '1.9.0', date: '2026-10-15',
+      highlights: [
+        '新增「Inventor 建模」标签页：两条路都能直接出模型',
+        '路径 A（零安装）：导出一键运行的 VBA 宏 InventorBuild.bas + 参数 JSON + 中文说明',
+        '路径 B（一键）：配套本地桥 inventor-bridge（Node 零依赖），网页点按钮即让 Inventor 建模',
+        'VBA 宏输出纯 ASCII（VBA 按系统 ANSI 读文件，中文注释会乱码）',
+        '本地桥只监听 127.0.0.1、校验 Origin、只收数字参数，数据不外传'
+      ]
+    },
     {
       version: '1.8.1', date: '2026-10-15',
       highlights: [
