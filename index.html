@@ -613,6 +613,13 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
 #view-result .tab.on .cnt{background:rgba(76,201,240,.24);color:var(--acc)}
 #view-result .tab .cnt:empty{display:none}
 /* Inventor 建模面板 */
+#panel-inventor .invblock.ilogic{border-color:rgba(76,201,240,.45);background:rgba(76,201,240,.06)}
+#panel-inventor .ilogic-head{display:flex;align-items:center;justify-content:space-between;
+  margin:12px 0 6px;font-size:11.5px;color:var(--tx2)}
+#panel-inventor .ilogic-code{width:100%;height:260px;resize:vertical;
+  background:#0d1117;color:#c9d1d9;border:1px solid var(--line);border-radius:8px;
+  padding:10px 12px;font-family:ui-monospace,Consolas,monospace;font-size:11px;
+  line-height:1.6;white-space:pre;overflow:auto}
 #panel-inventor .invguide{margin-top:12px;background:#fff;border:1px solid var(--line);
   border-radius:10px;padding:6px 20px 20px;color:#1c2024;max-height:620px;overflow:auto}
 #panel-inventor .invguide .sub{color:#6b7480;font-size:12px;margin-bottom:16px}
@@ -1192,8 +1199,40 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
           · 三种做法按风险从低到高排列，建议从第一个开始
         </div>
 
+        <div class="invblock ilogic">
+          <div class="invhead"><b>做法一 · iLogic 全自动</b><span class="invtag ok">不用装 VBA</span></div>
+          <div class="invstep">
+            <b>四个零件全自动生成，你只需要复制 + 粘贴 + 点运行。</b><br>
+            iLogic 用的是 VB.NET，<b>不需要 VBA 组件</b>。新版 Inventor 把 VBA 拆掉了，
+            但 iLogic 仍然随 Inventor Professional 一起安装。
+          </div>
+          <div class="btnrow" style="margin-top:9px">
+            <button class="btn sm pri" id="btnInvILogic">⚡ 生成 iLogic 规则（全自动建模）</button>
+            <button class="btn sm ghost" id="btnInvILogicTip">iLogic 在哪？</button>
+          </div>
+          <div id="invILogicTip" class="hint" style="display:none;margin-top:8px">
+            打开 Inventor → 顶部选项卡找 <b>「管理」</b>（或「Manage」）→ 里面有
+            <b>「iLogic」</b> 面板 → 点 <b>「添加规则」</b>。<br>
+            如果**没有 iLogic 面板**，说明你装的是 Inventor LT 或未安装 iLogic，
+            请用下面的「做法二 · 手工建模包」。
+          </div>
+          <div id="invILogicBox" style="display:none">
+            <div class="ilogic-head">
+              <span>生成的规则（<b id="invILogicSize">—</b>）</span>
+              <button class="btn sm" id="btnInvILogicCopy">📋 复制全部</button>
+            </div>
+            <textarea id="invILogicCode" class="ilogic-code" readonly spellcheck="false"></textarea>
+            <div class="invstep" style="margin-top:9px">
+              <div>1. <b>先在 Inventor 里关闭所有文档</b>（文件 → 关闭全部）</div>
+              <div>2. 点「复制全部」，把上面的代码复制走</div>
+              <div>3. Inventor → 管理选项卡 → iLogic 面板 → <b>添加规则</b></div>
+              <div>4. 粘贴进去，确定 → 点 <b>运行</b>，几秒后自动出 4 个零件</div>
+            </div>
+          </div>
+        </div>
+
         <div class="invblock">
-          <div class="invhead"><b>做法一 · 手工建模包</b><span class="invtag ok">零风险</span></div>
+          <div class="invhead"><b>做法二 · 手工建模包</b><span class="invtag ok">零风险兜底</span></div>
           <div class="invstep">
             下载后你有：参数 JSON + 两个翼型 DXF + 一份带具体数字的建模步骤。
             全部靠你在 Inventor 里照着点，<b>不运行任何代码</b>。
@@ -1211,7 +1250,7 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
         </div>
 
         <div class="invblock">
-          <div class="invhead"><b>做法二 · 环境自检宏</b><span class="invtag ok">零风险</span></div>
+          <div class="invhead"><b>做法三 · 环境自检宏</b><span class="invtag ok">零风险</span></div>
           <div class="invstep">
             一个只读的宏：报告 Inventor 版本、模板路径、三个基准面的法向。
             <b>不创建、不保存任何东西</b>。<br>
@@ -1224,7 +1263,7 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
         </div>
 
         <div class="invblock">
-          <div class="invhead"><b>做法三 · 草图宏</b><span class="invtag warn">低风险</span></div>
+          <div class="invhead"><b>做法四 · 草图宏</b><span class="invtag warn">低风险</span></div>
           <div class="invstep">
             新建 1 个零件，画出 6 个翼型轮廓草图。
             <b>不建任何实体特征</b>（不调 CreateProfile、不调放样），
@@ -3403,7 +3442,42 @@ function renderInventor() {
   }
 }
 
-/* ---- 做法一：手工包 ---- */
+/* ---- 做法一：iLogic 全自动 ---- */
+if ($('btnInvILogicTip')) $('btnInvILogicTip').onclick = function () {
+  const el = $('invILogicTip');
+  if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+};
+if ($('btnInvILogic')) $('btnInvILogic').onclick = function () {
+  const p = invParams();
+  if (!p) { toast('请先生成方案', 'err'); return; }
+  let code;
+  try { code = InventorExport.buildILogic(p); }
+  catch (e) { toast('规则生成失败：' + e.message, 'err'); return; }
+  const box = $('invILogicBox');
+  const ta = $('invILogicCode');
+  if (!box || !ta) return;
+  ta.value = code;
+  box.style.display = '';
+  if ($('invILogicSize')) {
+    $('invILogicSize').textContent = (code.length / 1024).toFixed(1) + ' KB · ' + code.split(/\r?\n/).length + ' 行';
+  }
+  toast('规则已生成，点「复制全部」后贴进 Inventor 的 iLogic', 'ok');
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+if ($('btnInvILogicCopy')) $('btnInvILogicCopy').onclick = function () {
+  const ta = $('invILogicCode');
+  if (!ta || !ta.value) { toast('请先生成规则', 'err'); return; }
+  const done = function () { toast('已复制，去 Inventor 里粘贴', 'ok'); };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(ta.value).then(done).catch(function () {
+      ta.select(); document.execCommand('copy'); done();
+    });
+  } else {
+    ta.select(); document.execCommand('copy'); done();
+  }
+};
+
+/* ---- 做法二：手工包 ---- */
 if ($('btnInvGuide')) $('btnInvGuide').onclick = function () {
   const p = invParams();
   if (!p) { toast('请先生成方案', 'err'); return; }
