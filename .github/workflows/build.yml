@@ -1,0 +1,38 @@
+name: Build Desktop EXE
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'desktop/**'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: install deps
+        working-directory: desktop
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: build exe
+        working-directory: desktop
+        run: python -m PyInstaller --noconfirm --onefile --windowed --name RCDesigner --collect-all webview --collect-all pythonnet --hidden-import clr --hidden-import clr_loader --hidden-import webview.platforms.edgechromium app.py
+
+      - name: upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RC-Designer-Windows
+          path: desktop/dist/RCDesigner.exe
+          if-no-files-found: error
