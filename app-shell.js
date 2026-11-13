@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '2.1.0';
+  const VERSION = '2.2.0';
   const SCHEMA = 'dsh-project@1';
   const STORE_KEY = 'dsh.rcDesigner.v1';
 
@@ -532,6 +532,17 @@
    * 8. Changelog
    * =================================================================== */
   const CHANGELOG = [
+    {
+      version: '2.2.0', date: '2026-10-16',
+      highlights: [
+        '新增「参数化自动建模」：iLogic 规则从零生成机翼/平尾/垂尾实体，不需要模板、不需要提前画实体',
+        '自动创建 16 个命名参数（翼展/根弦/尖弦/上反角/后掠角/机身/平尾/垂尾），改参数重跑规则即重建模型',
+        '三个入口：RC_Init 首次初始化、RC_Rebuild 按当前参数重建、RC_Push 写入网站数值',
+        '重建前自动清空旧实体/草图/偏移工作平面，所以可以反复改参数反复重建',
+        '参数名用 ASCII 标识符，中文只留在注释和提示里，规避 iLogic 标识符兼容风险',
+        '页面上直接列出 16 个参数名与当前值，方便和 Inventor 参数表对照'
+      ]
+    },
     {
       version: '2.1.0', date: '2026-10-16',
       highlights: [
