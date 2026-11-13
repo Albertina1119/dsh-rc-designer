@@ -634,16 +634,101 @@
   /* =====================================================================
    * 8. 手工建模指南（零风险路径）
    * =================================================================== */
-  function buildGuide(p) {
+  /** 把指南内容整理成结构化数据，供 Markdown 与 HTML 两种输出共用 */
+  function guideData(p) {
     const f = function (v) {
       return typeof v === 'number' && isFinite(v) ? v.toFixed(1) : '—';
     };
+    const dims = [
+      ['翼展', f(p.fullSpan), 'tip to tip'],
+      ['单侧半翼展', f(p.semiSpan), 'one side'],
+      ['机翼根弦', f(p.rootChord), 'root chord'],
+      ['机翼尖弦', f(p.tipChord), 'tip chord'],
+      ['平均弦长', f(p.meanChord), 'S / b'],
+      ['上反角 (°)', f(p.dihedral), 'dihedral'],
+      ['后掠角 (°)', f(p.sweep), 'sweep'],
+      ['机身总长', f(p.fuselageLength), 'fuselage length'],
+      ['机身最大宽', f(p.bodyMaxWidth), 'max width'],
+      ['机身最大高', f(p.bodyMaxHeight), 'max height'],
+      ['机头段长', f(p.noseLength), 'nose'],
+      ['机翼安装段长', f(p.wingMountLength), 'wing bay'],
+      ['平尾翼展', f(p.hStabSpan), 'h-stab span'],
+      ['平尾根弦', f(p.hStabRootChord), 'h-stab root'],
+      ['平尾尖弦', f(p.hStabTipChord), 'h-stab tip'],
+      ['垂尾高度', f(p.vStabHeight), 'v-stab height'],
+      ['垂尾根弦', f(p.vStabRootChord), 'v-stab root'],
+      ['垂尾尖弦', f(p.vStabTipChord), 'v-stab tip'],
+      ['重心距机头', f(p.cgFromNose), 'CG from nose'],
+      ['碳管主梁直径', f(p.sparDia), 'spar tube'],
+      ['翼肋间距', f(p.ribSpacing), 'rib pitch']
+    ];
+
+    const wingTipShift = p.semiSpan * Math.tan(p.sweep * Math.PI / 180);
+    const wingRise = p.semiSpan * Math.tan(p.dihedral * Math.PI / 180);
+    const vTipShift = p.vStabHeight * Math.tan(p.vStabSweep * Math.PI / 180);
+
+    const steps = [
+      {
+        title: '机翼',
+        items: [
+          '新建零件（.ipt），把单位改成<b>毫米</b>',
+          '在 <b>XZ 平面</b>新建草图（该平面的法向是展向 Y）',
+          '插入 → 导入 <code>airfoil_root.dxf</code>，缩放使弦长 = <b>' + f(p.rootChord) + ' mm</b>',
+          '完成草图，重命名为 <code>wing_root</code>',
+          '新建工作平面：以 XZ 平面为基准，偏移 <b>' + f(p.semiSpan) + ' mm</b>',
+          '在该平面新建草图，导入 <code>airfoil_tip.dxf</code>，弦长 = <b>' + f(p.tipChord) + ' mm</b>',
+          '尖截面沿弦向平移 <b>' + f(wingTipShift) + ' mm</b>（后掠）',
+          '尖截面沿展向抬升 <b>' + f(wingRise) + ' mm</b>（上反）',
+          '放样（Loft）：选两个草图 → 确定',
+          '镜像到另一侧（关于 YZ 平面）'
+        ]
+      },
+      {
+        title: '机身',
+        items: [
+          '在 <b>XY 平面</b>新建草图',
+          '机头端矩形：宽 <b>' + f(p.bodyMaxWidth * 0.3) + '</b> × 高 <b>' + f(p.bodyMaxHeight * 0.3) + '</b>',
+          '偏移 <b>' + f(p.noseLength) + ' mm</b>，画最大截面：宽 <b>' + f(p.bodyMaxWidth) + '</b> × 高 <b>' + f(p.bodyMaxHeight) + '</b>',
+          '再偏移 <b>' + f(p.noseLength + p.wingMountLength) + ' mm</b>，同一截面',
+          '末端偏移 <b>' + f(p.fuselageLength) + ' mm</b>，尾部矩形：宽 <b>' + f(p.bodyMaxWidth * 0.28) + '</b> × 高 <b>' + f(p.bodyMaxHeight * 0.34) + '</b>',
+          '放样四个截面'
+        ]
+      },
+      {
+        title: '平尾',
+        items: [
+          'XZ 平面画根截面，弦长 <b>' + f(p.hStabRootChord) + ' mm</b>',
+          '偏移 <b>' + f(p.hStabSpan / 2) + ' mm</b> 画尖截面，弦长 <b>' + f(p.hStabTipChord) + ' mm</b>',
+          '放样 → 镜像'
+        ]
+      },
+      {
+        title: '垂尾',
+        items: [
+          'XY 平面画根截面，弦长 <b>' + f(p.vStabRootChord) + ' mm</b>',
+          '竖直偏移 <b>' + f(p.vStabHeight) + ' mm</b> 画尖截面，弦长 <b>' + f(p.vStabTipChord) + ' mm</b>',
+          '沿弦向平移 <b>' + f(vTipShift) + ' mm</b>（后掠）',
+          '放样'
+        ]
+      }
+    ];
+
+    const assembly = [
+      ['机翼', '前缘距机头 ' + f(p.cgFromNose - p.mac * p.cgPctMac / 100) + ' mm，垂直居中'],
+      ['平尾', '前缘距机头 ' + f(p.fuselageLength - p.hStabRootChord) + ' mm'],
+      ['垂尾', '根弦前缘与平尾前缘对齐，贴机身上表面']
+    ];
+
+    return { f: f, dims: dims, steps: steps, assembly: assembly };
+  }
+
+  /** 手工建模指南（Markdown 版，供程序化使用） */
+  function buildGuide(p) {
+    const g = guideData(p);
     const L = [];
     L.push('# Inventor 手工建模步骤（零风险）');
     L.push('');
-    L.push('> 这条路**不运行任何宏、不连你的 Inventor**。');
-    L.push('> 全部靠你在 Inventor 里照着数字点几下。');
-    L.push('> 如果你不想再冒任何风险，就只用这条。');
+    L.push('> 这条路不运行任何宏、不连你的 Inventor。');
     L.push('');
     L.push('## 方案');
     L.push('');
@@ -654,81 +739,121 @@
     L.push('| 翼型 | ' + p.airfoilName + ' |');
     L.push('| 校验码 | ' + (p.checksum || '—') + ' |');
     L.push('');
-    L.push('## 一、关键尺寸（mm）');
+    L.push('## 关键尺寸（mm）');
     L.push('');
     L.push('| 参数 | 值 |');
     L.push('|---|---|');
-    [
-      ['翼展', f(p.fullSpan)], ['单侧半翼展', f(p.semiSpan)],
-      ['机翼根弦', f(p.rootChord)], ['机翼尖弦', f(p.tipChord)],
-      ['平均弦长', f(p.meanChord)], ['上反角 (°)', f(p.dihedral)], ['后掠角 (°)', f(p.sweep)],
-      ['机身总长', f(p.fuselageLength)], ['机身最大宽', f(p.bodyMaxWidth)],
-      ['机身最大高', f(p.bodyMaxHeight)], ['机头段长', f(p.noseLength)],
-      ['机翼安装段长', f(p.wingMountLength)],
-      ['平尾翼展', f(p.hStabSpan)], ['平尾根弦', f(p.hStabRootChord)],
-      ['平尾尖弦', f(p.hStabTipChord)],
-      ['垂尾高度', f(p.vStabHeight)], ['垂尾根弦', f(p.vStabRootChord)],
-      ['垂尾尖弦', f(p.vStabTipChord)],
-      ['重心距机头', f(p.cgFromNose)], ['碳管主梁直径', f(p.sparDia)],
-      ['翼肋间距', f(p.ribSpacing)]
-    ].forEach(function (r) { L.push('| ' + r[0] + ' | ' + r[1] + ' |'); });
+    g.dims.forEach(function (d) { L.push('| ' + d[0] + ' | ' + d[1] + ' |'); });
     L.push('');
-    L.push('## 二、机翼');
-    L.push('');
-    L.push('1. 新建零件（.ipt），单位改为毫米');
-    L.push('2. 在 **XZ 平面**新建草图（该平面法向为展向 Y）');
-    L.push('3. 插入 → 导入 `airfoil_root.dxf`，缩放使**弦长 = ' + f(p.rootChord) + ' mm**');
-    L.push('4. 完成草图，改名 `wing_root`');
-    L.push('5. 新建工作平面：以 XZ 为基准，偏移 **' + f(p.semiSpan) + ' mm**');
-    L.push('6. 在该平面新建草图，导入 `airfoil_tip.dxf`，**弦长 = ' + f(p.tipChord) + ' mm**');
-    L.push('7. 沿弦向平移 **' + f(p.semiSpan * Math.tan(p.sweep * Math.PI / 180)) +
-      ' mm**（后掠）');
-    L.push('8. 沿展向抬升 **' + f(p.semiSpan * Math.tan(p.dihedral * Math.PI / 180)) +
-      ' mm**（上反）');
-    L.push('9. 放样（Loft）：选两个草图 → 确定');
-    L.push('10. 镜像到另一侧（关于 YZ 平面）');
-    L.push('');
-    L.push('## 三、机身');
-    L.push('');
-    L.push('1. 在 XY 平面新建草图');
-    L.push('2. 机头端矩形：宽 ' + f(p.bodyMaxWidth * 0.3) + ' × 高 ' + f(p.bodyMaxHeight * 0.3));
-    L.push('3. 偏移 ' + f(p.noseLength) + ' mm 处画最大截面：宽 ' +
-      f(p.bodyMaxWidth) + ' × 高 ' + f(p.bodyMaxHeight));
-    L.push('4. 再偏移 ' + f(p.noseLength + p.wingMountLength) + ' mm，同截面');
-    L.push('5. 末端偏移 ' + f(p.fuselageLength) + ' mm，尾部矩形：宽 ' +
-      f(p.bodyMaxWidth * 0.28) + ' × 高 ' + f(p.bodyMaxHeight * 0.34));
-    L.push('6. 放样四个截面');
-    L.push('');
-    L.push('## 四、平尾');
-    L.push('');
-    L.push('1. XZ 平面画根截面，弦长 ' + f(p.hStabRootChord) + ' mm');
-    L.push('2. 偏移 ' + f(p.hStabSpan / 2) + ' mm 画尖截面，弦长 ' +
-      f(p.hStabTipChord) + ' mm');
-    L.push('3. 放样 → 镜像');
-    L.push('');
-    L.push('## 五、垂尾');
-    L.push('');
-    L.push('1. XY 平面画根截面，弦长 ' + f(p.vStabRootChord) + ' mm');
-    L.push('2. 竖直偏移 ' + f(p.vStabHeight) + ' mm 画尖截面，弦长 ' +
-      f(p.vStabTipChord) + ' mm');
-    L.push('3. 沿弦向平移 ' + f(p.vStabHeight * Math.tan(p.vStabSweep * Math.PI / 180)) +
-      ' mm（后掠）');
-    L.push('4. 放样');
-    L.push('');
-    L.push('## 六、装配定位');
+    const CN = ['二', '三', '四', '五', '六', '七'];
+    g.steps.forEach(function (sec, si) {
+      L.push('## ' + CN[si] + '、' + sec.title);
+      L.push('');
+      sec.items.forEach(function (it, ii) {
+        L.push((ii + 1) + '. ' + it.replace(/<[^>]+>/g, ''));
+      });
+      L.push('');
+    });
+    L.push('## ' + CN[g.steps.length] + '、装配定位');
     L.push('');
     L.push('| 零件 | 定位 |');
     L.push('|---|---|');
-    L.push('| 机翼 | 前缘距机头 ' +
-      f(p.cgFromNose - p.mac * p.cgPctMac / 100) + ' mm，垂直居中 |');
-    L.push('| 平尾 | 前缘距机头 ' + f(p.fuselageLength - p.hStabRootChord) + ' mm |');
-    L.push('| 垂尾 | 根弦前缘与平尾前缘对齐，贴机身上表面 |');
+    g.assembly.forEach(function (r) { L.push('| ' + r[0] + ' | ' + r[1] + ' |'); });
     L.push('');
-    L.push('## 七、保存');
+    L.push('## ' + CN[g.steps.length + 1] + '、保存');
     L.push('');
-    L.push('全部完成后**由你自己**另存到想要的路径。本工具不写任何文件。');
+    L.push('全部完成后由你自己另存。本工具不写任何文件。');
     L.push('');
     return L.join('\r\n');
+  }
+
+  /** 手工建模指南（HTML 版，双击即在浏览器打开，可打印） */
+  function buildGuideHtml(p) {
+    const g = guideData(p);
+    const esc = function (t) {
+      return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    };
+    const raw = function (t) { return String(t); };  // 已内含 <b>/<code>，原样输出
+
+    const H = [];
+    H.push('<!DOCTYPE html>');
+    H.push('<html lang="zh-CN"><head><meta charset="utf-8">');
+    H.push('<meta name="viewport" content="width=device-width,initial-scale=1">');
+    H.push('<title>' + esc(p.project) + ' · Inventor 建模步骤</title>');
+    H.push('<style>');
+    H.push('*{box-sizing:border-box}');
+    H.push('body{margin:0;padding:28px 32px 64px;background:#f5f6f8;color:#1c2024;' +
+      'font:15px/1.85 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif}');
+    H.push('.wrap{max-width:880px;margin:0 auto;background:#fff;border-radius:12px;' +
+      'padding:36px 44px 44px;box-shadow:0 2px 20px rgba(0,0,0,.07)}');
+    H.push('h1{margin:0 0 6px;font-size:25px;letter-spacing:-.4px}');
+    H.push('.sub{color:#6b7480;font-size:13px;margin-bottom:26px}');
+    H.push('h2{margin:34px 0 12px;font-size:17px;padding-bottom:8px;' +
+      'border-bottom:2px solid #e8ecf1;color:#0d3b66}');
+    H.push('table{width:100%;border-collapse:collapse;margin:10px 0 4px;font-size:14px}');
+    H.push('th,td{padding:8px 12px;border:1px solid #e2e7ed;text-align:left}');
+    H.push('th{background:#f0f4f8;font-weight:600;width:44%}');
+    H.push('td.val{font-family:ui-monospace,Consolas,monospace;font-weight:600;color:#0b6b3a}');
+    H.push('td.eng{color:#95a1ad;font-size:12.5px}');
+    H.push('ol{padding-left:22px;margin:8px 0}');
+    H.push('li{margin:5px 0}');
+    H.push('b{color:#0d3b66}');
+    H.push('code{background:#eef3f8;color:#0550a0;padding:1px 6px;border-radius:4px;' +
+      'font-family:ui-monospace,Consolas,monospace;font-size:13px}');
+    H.push('.safe{background:#eaf9f0;border:1px solid #a8e6c1;border-radius:9px;' +
+      'padding:14px 18px;margin:22px 0;font-size:13.5px;line-height:1.9;color:#1a5c38}');
+    H.push('.safe b{color:#0b6b3a}');
+    H.push('.meta{display:flex;flex-wrap:wrap;gap:10px 28px;font-size:13.5px;' +
+      'color:#4a5560;margin-bottom:4px}');
+    H.push('.meta span b{color:#1c2024}');
+    H.push('.print{position:fixed;right:22px;bottom:22px;background:#0d6efd;color:#fff;' +
+      'border:none;border-radius:999px;padding:12px 22px;font-size:14px;cursor:pointer;' +
+      'box-shadow:0 4px 16px rgba(13,110,253,.35)}');
+    H.push('.print:hover{background:#0b5ed7}');
+    H.push('@media print{body{background:#fff;padding:0}.wrap{box-shadow:none;padding:0}' +
+      '.print{display:none}h2{page-break-after:avoid}}');
+    H.push('</style></head><body><div class="wrap">');
+
+    H.push('<h1>' + esc(p.project) + ' · Inventor 建模步骤</h1>');
+    H.push('<div class="sub">' + esc(p.typeName || '') +
+      '　翼型 ' + esc(p.airfoilName) +
+      '　校验码 ' + esc(p.checksum || '—') + '</div>');
+
+    H.push('<div class="safe"><b>这份文档不运行任何代码。</b><br>' +
+      '跟着下面的数字在 Inventor 里操作即可。它不会连接、启动或控制 Inventor，' +
+      '也不会读写你电脑上的任何文件。</div>');
+
+    H.push('<h2>一、关键尺寸（全部为毫米）</h2>');
+    H.push('<table><tr><th>参数</th><th>数值</th><th>English</th></tr>');
+    g.dims.forEach(function (d) {
+      H.push('<tr><th>' + esc(d[0]) + '</th><td class="val">' + esc(d[1]) +
+        '</td><td class="eng">' + esc(d[2]) + '</td></tr>');
+    });
+    H.push('</table>');
+
+    const CN = ['二', '三', '四', '五', '六'];
+    g.steps.forEach(function (sec, si) {
+      H.push('<h2>' + CN[si] + '、' + esc(sec.title) + '</h2><ol>');
+      sec.items.forEach(function (it) {
+        H.push('<li>' + raw(it) + '</li>');
+      });
+      H.push('</ol>');
+    });
+
+    H.push('<h2>' + CN[g.steps.length] + '、装配定位</h2>');
+    H.push('<table><tr><th>零件</th><th>定位方式</th></tr>');
+    g.assembly.forEach(function (r) {
+      H.push('<tr><th>' + esc(r[0]) + '</th><td>' + esc(r[1]) + '</td></tr>');
+    });
+    H.push('</table>');
+
+    H.push('<h2>' + CN[g.steps.length + 1] + '、保存</h2>');
+    H.push('<p>全部完成后<b>由你自己</b>另存到想要的路径。本工具不写任何文件。</p>');
+
+    H.push('</div>');
+    H.push('<button class="print" onclick="window.print()">🖨 打印 / 存为 PDF</button>');
+    H.push('</body></html>');
+    return H.join('\r\n');
   }
 
   function paramsToJson(p) {
@@ -784,6 +909,8 @@
     paramsFromCore: paramsFromCore,
     buildVba: buildVba,
     buildGuide: buildGuide,
+    buildGuideHtml: buildGuideHtml,
+    guideData: guideData,
     paramsToJson: paramsToJson,
     airfoilDxf: airfoilDxf,
     asciiOnly: asciiOnly,
