@@ -19,7 +19,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  const VERSION = '2.2.2';
+  const VERSION = '2.2.3';
   const SCHEMA = 'dsh-project@1';
   const STORE_KEY = 'dsh.rcDesigner.v1';
 
@@ -532,6 +532,15 @@
    * 8. Changelog
    * =================================================================== */
   const CHANGELOG = [
+    {
+      version: '2.2.3', date: '2026-10-16',
+      highlights: [
+        '修复：翼型坐标用 { _ 续行导致「数字标签后面必须跟冒号」——改为单行字符串 + Split 解析',
+        '修复：Inventor 2027 的 LoftFeatures.Add 只接受 LoftDefinition，改为 CreateLoftDefinition + Add(def)',
+        '以上两处来自真实 Inventor 2027 的编译错误反馈（行 121/123/227），不是猜测',
+        '新增结构自检：确认没有以数字开头的行、无数组续行、放样签名正确'
+      ]
+    },
     {
       version: '2.2.2', date: '2026-10-16',
       highlights: [
