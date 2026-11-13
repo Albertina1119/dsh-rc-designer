@@ -28,7 +28,7 @@ jobs:
 
       - name: build exe
         working-directory: desktop
-        run: python -m PyInstaller --noconfirm --onefile --windowed --name RCDesigner --collect-all webview --collect-all pythonnet --hidden-import clr --hidden-import clr_loader --hidden-import webview.platforms.edgechromium app.py
+        run: python -m PyInstaller --noconfirm --onefile --windowed --name RCDesigner --icon app.ico --collect-all webview --collect-all pythonnet --hidden-import clr --hidden-import clr_loader --hidden-import webview.platforms.edgechromium app.py
 
       - name: upload artifact
         uses: actions/upload-artifact@v4
