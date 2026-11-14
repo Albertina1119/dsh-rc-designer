@@ -1,1 +1,6 @@
+# 桌面窗口 + Inventor 驱动需要的两个包
+# pywebview 在 Windows 上使用系统自带的 Edge WebView2 渲染
 pywebview>=5.0
+
+# pywin32 提供 win32com / pythoncom，用于通过 COM 操作 Inventor
+pywin32>=306
