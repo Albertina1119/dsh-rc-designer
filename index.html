@@ -3448,7 +3448,8 @@ function invParams() {
   const c = plan.core;
   let contour = null;
   try {
-    if (c.airfoil && AeroLib.contour) contour = AeroLib.contour(c.airfoil.designation, 40, c.planform.root);
+    // 弦长传 1 => 得到归一化 0..1 坐标；下游（VBA / iLogic / 桥）自己乘真实弦长
+    if (c.airfoil && AeroLib.contour) contour = AeroLib.contour(c.airfoil.designation, 40, 1);
   } catch (e) {}
   return InventorExport.paramsFromCore(c, S.result.modelingParams, {
     projectName: S.name || (S.naming && S.naming.name) || '方案',
