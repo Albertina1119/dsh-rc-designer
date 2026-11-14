@@ -26,9 +26,12 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
+      - name: run pywin32 postinstall
+        run: python -c "import sys,os; p=os.path.join(sys.prefix,'Scripts','pywin32_postinstall.py'); print(p, os.path.exists(p))"
+
       - name: build exe
         working-directory: desktop
-        run: python -m PyInstaller --noconfirm --onefile --windowed --name RCDesigner --icon app.ico --collect-all webview --collect-all pythonnet --hidden-import clr --hidden-import clr_loader --hidden-import webview.platforms.edgechromium app.py
+        run: python -m PyInstaller --noconfirm --onefile --windowed --name RCDesigner --icon app.ico --collect-all webview --collect-all pythonnet --collect-submodules win32com --collect-submodules win32timezone --hidden-import clr --hidden-import clr_loader --hidden-import webview.platforms.edgechromium --hidden-import win32com --hidden-import win32com.client --hidden-import pythoncom --hidden-import pywintypes --hidden-import win32timezone app.py
 
       - name: upload artifact
         uses: actions/upload-artifact@v4
@@ -36,3 +39,4 @@ jobs:
           name: RC-Designer-Windows
           path: desktop/dist/RCDesigner.exe
           if-no-files-found: error
+
