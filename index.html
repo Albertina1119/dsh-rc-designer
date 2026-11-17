@@ -1210,16 +1210,36 @@ details.faqitem .faqa ul{padding-left:20px;margin:6px 0}
       <h2><span class="n">13</span>Inventor 建模包<span class="r" id="invStatus"></span></h2>
       <div class="body">
         <div class="invsafe">
-          <b>先说清楚：这个功能不会碰你的 Inventor</b><br>
-          · 这里所有按钮都只是**下载文件**，不连接、不启动、不控制 Inventor<br>
-          · 没有任何本地服务、没有 PowerShell、没有 COM 自动化<br>
-          · 下面的宏里没有 打开 / 保存 / 覆盖 / 删除 任何文件的调用<br>
-          · 宏运行前会检查：<b>Inventor 里有任何文档打开就拒绝执行</b><br>
-          · 三种做法按风险从低到高排列，建议从第一个开始
+          <b>这个标签页提供两条出模型的路，按钮是分开的</b><br>
+          · <b>Fusion 360</b>（推荐）：生成 <code>.stl</code> 网格文件，Fusion 里一插入就能用，还能「网格 → BRep」转成实体<br>
+          · <b>Inventor 一键建模</b>：通过本机桥（PowerShell + COM）直接驱动 Inventor 出模型并存成 <code>.ipt</code><br>
+          · 桥只在你本机跑，监听 <code>127.0.0.1</code>，不联网、不上传任何数据<br>
+          · 运行前检查：Inventor 有文档打开就拒绝执行；同名文件不覆盖，自动加 <code>_001</code><br>
+          · 说明：Inventor 这边出的是<b>网格体</b>（第三方参考），可看/可量/可导出，但不能打孔改尺寸
         </div>
 
         <div class="invblock drive">
-          <div class="invhead"><b>一键在 Inventor 中建模</b><span class="invtag live" id="drvTag">桥未连接</span></div>
+          <div class="invhead"><b>Fusion 360 · 导出网格模型</b><span class="invtag ok" id="fuTag">推荐</span></div>
+          <div class="invstep">
+            <b>Fusion 360 对网格的支持比 Inventor 强得多。</b>
+            点按钮 → 生成 <code>.stl</code> 并自动打开文件夹 →
+            在 Fusion 里「插入 → 插入网格」选中它 → 可用「网格」工作区的 <b>转换 → BRep</b> 变成可编辑实体。<br>
+            <b>不需要 Inventor</b>，只要本机桥在运行。
+          </div>
+          <div class="drv-row">
+            <label>导出到哪个文件夹</label>
+            <input id="fuDir" value="C:\RC模型" spellcheck="false">
+          </div>
+          <div class="btnrow" style="margin-top:9px">
+            <button class="btn sm pri" id="fuExport">⬇ 生成网格文件（.stl）</button>
+            <button class="btn sm ghost" id="fuConnect">连接本机桥</button>
+            <button class="btn sm ghost" id="fuHelp">Fusion 导入步骤</button>
+          </div>
+          <div id="fuLog" class="drvlog" style="display:none"></div>
+        </div>
+
+        <div class="invblock drive">
+          <div class="invhead"><b>Inventor · 一键建模（驱动本机 Inventor）</b><span class="invtag live" id="drvTag">桥未连接</span></div>
           <div class="invstep">
             <b>这个按钮会真的在 Inventor 里把零件画出来。</b>
             不需要模板、不需要 iLogic、不需要粘代码。点一下 → 零件自动出现在 Inventor 里并保存成 .ipt。
@@ -3551,6 +3571,14 @@ if ($('drvConnect')) $('drvConnect').onclick = function () {
       return;
     }
     if (d.status === 'ok') {
+      if (d.file && /\.stl$/i.test(d.file)) {
+        fuLog('✓ 网格已生成（' + Math.round((d.size || 0) / 1024) + ' KB）\n' + d.file +
+          '\n\n下一步：Fusion 360 → 插入 → 插入网格 → 选这个文件\n然后：网格工作区 → 转换 → BRep\n\n' +
+          (d.log || ''), false);
+        toast('网格已导出：' + d.file, 'ok');
+        drvTag('桥已连接 · Inventor 就绪', 'ok');
+        return;
+      }
       if (d.file) {
         drvLog('✓ 建模完成，已保存到：\n' + d.file + '\n\n' + (d.log || ''), false);
         toast('Inventor 已生成零件：' + d.file, 'ok');
@@ -3581,6 +3609,40 @@ function drvDoBuild(dry) {
 }
 if ($('drvBuild')) $('drvBuild').onclick = function () { drvDoBuild(false); };
 if ($('drvDry')) $('drvDry').onclick = function () { drvDoBuild(true); };
+
+/* ---- Fusion 360：只导出网格 ---- */
+function fuLog(text, isErr) {
+  const el = $('fuLog');
+  if (!el) return;
+  el.style.display = '';
+  el.className = 'drvlog' + (isErr ? ' err' : '');
+  el.textContent = text;
+}
+if ($('fuExport')) $('fuExport').onclick = function () {
+  const p = invParams();
+  if (!p) { toast('请先生成方案', 'err'); return; }
+  const dirEl = $('fuDir');
+  const dir = ((dirEl && dirEl.value) || 'C:\\RC模型').replace(/[\\/]+$/, '');
+  const nm = ((p.project || 'RC') + '').replace(/[\\/:*?"<>|\s]+/g, '_').slice(0, 30);
+  const ts = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 15);
+  const outPath = dir + '\\' + nm + '_' + ts + '.stl';
+  if (drvSend({ cmd: 'export', params: p, outPath: outPath })) {
+    fuLog('已发送，正在生成网格…\n' + outPath, false);
+  }
+};
+if ($('fuConnect')) $('fuConnect').onclick = function () {
+  if ($('drvConnect')) $('drvConnect').click();
+  fuLog('正在连接本机桥…', false);
+};
+if ($('fuHelp')) $('fuHelp').onclick = function () {
+  fuLog('Fusion 360 导入步骤\n' +
+    '1. 点「生成网格文件」，文件夹会自动打开\n' +
+    '2. Fusion 360 → 插入 → 插入网格（Insert Mesh）\n' +
+    '3. 选刚生成的 .stl → 确定\n' +
+    '4. 想变成可编辑实体：网格工作区 → 修改 → 转换（Convert）→ BRep\n' +
+    '5. 转换后就能拉伸切除、打孔、做阵列\n\n' +
+    '提示：Fusion 免费个人版也支持插入网格和网格转 BRep。', false);
+};
 
 /* ---- 做法一：参数化自动建模 ---- */
 var INV_PARAM_LABELS = [
